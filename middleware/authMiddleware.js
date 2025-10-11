@@ -35,4 +35,6 @@ function checkForAuthenticationCookie() {
   };
 }
 
-module.exports = checkForAuthenticationCookie;
+module.exports = { 
+ checkForAuthenticationCookie
+};

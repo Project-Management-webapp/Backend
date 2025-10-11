@@ -9,22 +9,15 @@ const User = sequelize.define('User', {
   },
   // Basic Information
   employeeId: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.STRING(255),
     allowNull: true,
     unique: true,
   },
-  firstName: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-  },
-  middleName: {
+  fullName: {
     type: DataTypes.STRING(50),
     allowNull: true,
   },
-  lastName: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-  },
+
   email: {
     type: DataTypes.STRING(100),
     allowNull: false,
@@ -68,12 +61,9 @@ const User = sequelize.define('User', {
     allowNull: true,
   },
   managerId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.STRING(255),
     allowNull: true,
-    references: {
-      model: 'users',
-      key: 'id',
-    },
+    unique: true,
   },
   
   // Contact Information
@@ -315,19 +305,18 @@ const User = sequelize.define('User', {
     allowNull: true,
   },
   
+
+  
   // Verification Status
   emailVerified: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
-  },
-  phoneVerified: {
+ },
+   isApproved: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
-  },
-  documentsVerified: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
-  },
+ },
+
 }, {
   tableName: 'users',
   timestamps: true,

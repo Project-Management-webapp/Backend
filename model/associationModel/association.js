@@ -6,17 +6,9 @@ const Message = require('../messageModel/message');
 const Payment = require('../paymentModel/payment');
 const Notification = require('../notificationModel/notification');
 
-// Manager-Employee relationship (Self-referencing)
-User.hasMany(User, { 
-  foreignKey: 'managerId', 
-  as: 'subordinates' 
-});
-User.belongsTo(User, { 
-  foreignKey: 'managerId', 
-  as: 'manager' 
-});
 
-// User and Project associations
+
+
 User.hasMany(Project, { 
   foreignKey: 'createdBy', 
   as: 'createdProjects' 
