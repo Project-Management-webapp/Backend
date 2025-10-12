@@ -5,8 +5,10 @@ const handleGetAllEmployees = async (req, res) => {
   try {
 
     const employees  = await User.findAndCountAll({
+      where: {
       role: ['employee'],
-      attributes: { exclude: ['password'] },
+      isApproved: true
+      },
       order: [['createdAt', 'DESC']]
     });
 

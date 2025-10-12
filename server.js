@@ -5,7 +5,7 @@ const cors = require("cors");
 const initDB = require("./mysqlConnection/dbinit");
 
 const app = express();
-const PORT = process.env.PORT || 8567;
+const PORT = process.env.PORT || 8000;
 
 const allowedOrigins = [process.env.FRONTEND_URL];
 
