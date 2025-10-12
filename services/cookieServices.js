@@ -2,6 +2,7 @@ const { serialize } = require("cookie");
 const setTokenCookie = (res, token) => {
   res.setHeader("Set-Cookie", [
     serialize("token", token, {
+     domain:".pixbit.me",
       httpOnly: true,
       secure: true,
       sameSite: "none",
@@ -14,7 +15,7 @@ const setTokenCookie = (res, token) => {
 const clearTokenCookie = (res) => {
   res.setHeader("Set-Cookie", [
     serialize("token", "", {
-
+        domain:".pixbit.me",
       httpOnly: true,
       secure: true,
       sameSite: "none",
