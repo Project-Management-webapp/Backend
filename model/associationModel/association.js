@@ -1,14 +1,14 @@
 const User = require('../userModel/user');
 const Project = require('../projectModel/project');
-const Task = require('../taskModel/task');
 const ProjectAssignment = require('../projectAssignmentModel/projectAssignment');
 const Message = require('../messageModel/message');
 const Payment = require('../paymentModel/payment');
 const Notification = require('../notificationModel/notification');
+const SupportTicket = require('../supportTicketModel/supportTicket');
 
 
 
-
+// User and Project associations
 User.hasMany(Project, { 
   foreignKey: 'createdBy', 
   as: 'createdProjects' 
@@ -18,34 +18,7 @@ Project.belongsTo(User, {
   as: 'creator' 
 });
 
-// User and Task associations
-User.hasMany(Task, { 
-  foreignKey: 'assignedTo', 
-  as: 'assignedTasks' 
-});
-Task.belongsTo(User, { 
-  foreignKey: 'assignedTo', 
-  as: 'assignee' 
-});
 
-User.hasMany(Task, { 
-  foreignKey: 'createdBy', 
-  as: 'createdTasks' 
-});
-Task.belongsTo(User, { 
-  foreignKey: 'createdBy', 
-  as: 'creator' 
-});
-
-// Project and Task associations
-Project.hasMany(Task, { 
-  foreignKey: 'projectId', 
-  as: 'tasks' 
-});
-Task.belongsTo(Project, { 
-  foreignKey: 'projectId', 
-  as: 'project' 
-});
 
 // User and ProjectAssignment associations (Many-to-Many through ProjectAssignment)
 User.hasMany(ProjectAssignment, { 
@@ -146,6 +119,24 @@ Payment.belongsTo(User, {
   as: 'processor' 
 });
 
+User.hasMany(Payment, { 
+  foreignKey: 'approvedBy', 
+  as: 'approvedPayments' 
+});
+Payment.belongsTo(User, { 
+  foreignKey: 'approvedBy', 
+  as: 'approver' 
+});
+
+User.hasMany(Payment, { 
+  foreignKey: 'rejectedBy', 
+  as: 'rejectedPayments' 
+});
+Payment.belongsTo(User, { 
+  foreignKey: 'rejectedBy', 
+  as: 'rejecter' 
+});
+
 Project.hasMany(Payment, { 
   foreignKey: 'projectId', 
   as: 'payments' 
@@ -153,6 +144,15 @@ Project.hasMany(Payment, {
 Payment.belongsTo(Project, { 
   foreignKey: 'projectId', 
   as: 'project' 
+});
+
+ProjectAssignment.hasMany(Payment, { 
+  foreignKey: 'assignmentId', 
+  as: 'payments' 
+});
+Payment.belongsTo(ProjectAssignment, { 
+  foreignKey: 'assignmentId', 
+  as: 'assignment' 
 });
 
 // Notification associations
@@ -165,3 +165,67 @@ Notification.belongsTo(User, {
   as: 'user' 
 });
 
+// SupportTicket associations
+User.hasMany(SupportTicket, { 
+  foreignKey: 'employeeId', 
+  as: 'supportTickets' 
+});
+SupportTicket.belongsTo(User, { 
+  foreignKey: 'employeeId', 
+  as: 'employee' 
+});
+
+User.hasMany(SupportTicket, { 
+  foreignKey: 'assignedTo', 
+  as: 'assignedTickets' 
+});
+SupportTicket.belongsTo(User, { 
+  foreignKey: 'assignedTo', 
+  as: 'assignedToUser' 
+});
+
+User.hasMany(SupportTicket, { 
+  foreignKey: 'resolvedBy', 
+  as: 'resolvedTickets' 
+});
+SupportTicket.belongsTo(User, { 
+  foreignKey: 'resolvedBy', 
+  as: 'resolvedByUser' 
+});
+
+User.hasMany(SupportTicket, { 
+  foreignKey: 'closedBy', 
+  as: 'closedTickets' 
+});
+SupportTicket.belongsTo(User, { 
+  foreignKey: 'closedBy', 
+  as: 'closedByUser' 
+});
+
+Project.hasMany(SupportTicket, { 
+  foreignKey: 'relatedProjectId', 
+  as: 'supportTickets' 
+});
+SupportTicket.belongsTo(Project, { 
+  foreignKey: 'relatedProjectId', 
+  as: 'relatedProject' 
+});
+
+Payment.hasMany(SupportTicket, { 
+  foreignKey: 'relatedPaymentId', 
+  as: 'supportTickets' 
+});
+SupportTicket.belongsTo(Payment, { 
+  foreignKey: 'relatedPaymentId', 
+  as: 'relatedPayment' 
+});
+
+// ProjectAssignment work verification associations
+User.hasMany(ProjectAssignment, { 
+  foreignKey: 'workVerifiedBy', 
+  as: 'verifiedAssignments' 
+});
+ProjectAssignment.belongsTo(User, { 
+  foreignKey: 'workVerifiedBy', 
+  as: 'verifier' 
+});

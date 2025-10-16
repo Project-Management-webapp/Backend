@@ -28,31 +28,9 @@ const Notification = sequelize.define('Notification', {
     allowNull: false,
     defaultValue: 'general',
   },
-  isRead: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
-  },
-  readAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-  },
-  relatedId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-  },
-  relatedType: {
-    type: DataTypes.ENUM('project', 'task', 'payment', 'user'),
-    allowNull: true,
-  },
-  priority: {
-    type: DataTypes.ENUM('low', 'medium', 'high'),
-    allowNull: false,
-    defaultValue: 'medium',
-  },
 }, {
   tableName: 'notifications',
   timestamps: true,
-  underscored: true,
 });
 
 module.exports = Notification;

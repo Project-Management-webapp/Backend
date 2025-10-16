@@ -9,7 +9,11 @@ const Message = sequelize.define('Message', {
   },
   content: {
     type: DataTypes.TEXT,
-    allowNull: false,
+    allowNull: true,
+  },
+   attachments: {
+    type: DataTypes.JSON,
+    allowNull: true,
   },
   senderId: {
     type: DataTypes.INTEGER,
@@ -19,51 +23,18 @@ const Message = sequelize.define('Message', {
       key: 'id',
     },
   },
-  receiverId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'users',
-      key: 'id',
-    },
-  },
   projectId: {
     type: DataTypes.INTEGER,
-    allowNull: true,
+    allowNull: false,
+    unique: true,
     references: {
       model: 'projects',
       key: 'id',
     },
   },
-  taskId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'tasks',
-      key: 'id',
-    },
-  },
-  messageType: {
-    type: DataTypes.ENUM('direct', 'project', 'task', 'announcement'),
-    allowNull: false,
-    defaultValue: 'direct',
-  },
-  isRead: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
-  },
-  readAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-  },
-  mentions: {
-    type: DataTypes.JSON,
-    allowNull: true,
-  },
 }, {
   tableName: 'messages',
   timestamps: true,
-  underscored: true,
 });
 
 module.exports = Message;

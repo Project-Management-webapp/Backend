@@ -35,27 +35,96 @@ const managerProfileRoutes = require("./routes/profileRoute/managerProfile");
 const employeeProfileRoutes = require("./routes/profileRoute/employeeProfile");
 const approvalRoutes = require("./routes/approvalRoute/approvalRoute");
 const employeeDetailRoutes = require("./routes/userRoute/employeeDetail");
+const managerProjectRoutes = require("./routes/projectRoute/managerProjectRoute");
+const employeeProjectRoutes = require("./routes/projectRoute/employeeProjectRoute");
+const managerProjectAssignmentRoutes = require("./routes/projectAssignmentRoute/managerProjectAssignmentRoute");
+const employeeProjectAssignmentRoutes = require("./routes/projectAssignmentRoute/employeeProjectAssignmentRoute");
+const managerPaymentRoutes = require("./routes/paymentRoute/managerPaymentRoute");
+const employeePaymentRoutes = require("./routes/paymentRoute/employeePaymentRoute");
+const messageRoutes = require("./routes/messageRoute/messageRoute");
+const notificationRoutes = require("./routes/notificationRoute/notificationRoute");
+const managerSupportTicketRoutes = require("./routes/supportTicketRoute/managerSupportTicketRoute");
+const employeeSupportTicketRoutes = require("./routes/supportTicketRoute/employeeSupportTicketRoute");
 const { checkForAuthenticationCookie } = require("./middleware/authMiddleware");
-const { authorizeRoles } = require("./middleware/roleMiddleware");
 
 app.use("/api/auth", employeeAuthRoutes, managerAuthRoutes, commonAuthRoutes);
+
 app.use(
   "/api/user/manager",
-  checkForAuthenticationCookie('token'),
-  authorizeRoles(['manager']),
+  checkForAuthenticationCookie("token"),
   managerProfileRoutes,
   approvalRoutes,
   employeeDetailRoutes
 );
+
 app.use(
   "/api/user/employee",
-  checkForAuthenticationCookie('token'),
-   authorizeRoles(['employee']),
-  employeeProfileRoutes,
-  approvalRoutes,
-  employeeDetailRoutes
+  checkForAuthenticationCookie("token"),
+  employeeProfileRoutes
 );
 
+// Manager/Admin Project Routes
+app.use(
+  "/api/manager/projects",
+  checkForAuthenticationCookie("token"),
+  managerProjectRoutes
+);
+
+// Employee Project Routes
+app.use(
+  "/api/employee/projects",
+  checkForAuthenticationCookie("token"),
+  employeeProjectRoutes
+);
+
+// Manager/Admin Project Assignment Routes
+app.use(
+  "/api/manager/project-assignments",
+  checkForAuthenticationCookie("token"),
+  managerProjectAssignmentRoutes
+);
+
+// Employee Project Assignment Routes
+app.use(
+  "/api/employee/project-assignments",
+  checkForAuthenticationCookie("token"),
+  employeeProjectAssignmentRoutes
+);
+
+// Manager/Admin Payment Routes
+app.use(
+  "/api/manager/payments",
+  checkForAuthenticationCookie("token"),
+  managerPaymentRoutes
+);
+
+// Employee Payment Routes
+app.use(
+  "/api/employee/payments",
+  checkForAuthenticationCookie("token"),
+  employeePaymentRoutes
+);
+
+app.use("/api/messages", checkForAuthenticationCookie("token"), messageRoutes);
+app.use(
+  "/api/notifications",
+  checkForAuthenticationCookie("token"),
+  notificationRoutes
+);
+
+// Manager/Admin Support Ticket Routes
+app.use(
+  "/api/manager/support-tickets",
+  checkForAuthenticationCookie("token"),
+  managerSupportTicketRoutes
+);
+
+// Employee Support Ticket Routes
+app.use(
+  "/api/employee/support-tickets",
+  checkForAuthenticationCookie("token"),
+  employeeSupportTicketRoutes
+);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });

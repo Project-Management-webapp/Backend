@@ -170,6 +170,41 @@ const User = sequelize.define('User', {
     allowNull: true,
     defaultValue: 'USD',
   },
+  
+  // Earnings Tracking
+  totalEarnings: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true,
+    defaultValue: 0.00,
+    comment: 'Total confirmed earnings from all sources'
+  },
+  projectEarnings: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'Array of project-based earnings [{projectId, projectName, amount, confirmedAt, paymentId}]'
+  },
+  pendingEarnings: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true,
+    defaultValue: 0.00,
+    comment: 'Total pending/unconfirmed payment amount'
+  },
+  completedProjectsCount: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
+    comment: 'Total number of successfully completed projects'
+  },
+  lastPaymentDate: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: 'Date of last confirmed payment'
+  },
+  lastPaymentAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+  
   payrollId: {
     type: DataTypes.STRING(50),
     allowNull: true,

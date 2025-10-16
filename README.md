@@ -260,13 +260,99 @@ Comprehensive user model supporting employees, managers, team leads, and admins 
 - `GET /api/user/manager/employees` - Get all employees with pagination and filtering
   - Query parameters: `page`, `limit`, `department`, `status`, `isApproved`
 - `GET /api/user/manager/employees/:employeeId` - Get specific employee details
-- `PUT /api/user/manager/employees/:employeeId` - Update employee information
 
 ### Employee Approval Endpoints
 
 - `GET /api/user/manager/pending` - Get pending employee approvals
 - `POST /api/user/manager/approve/:employeeId` - Approve employee registration
 - `POST /api/user/manager/reject/:employeeId` - Reject employee registration
+
+### Project Management Endpoints
+
+#### Project CRUD Operations
+- `POST /api/projects` - Create new project (Admin/Manager only)
+  - Body: `name`, `description`, `startDate`, `deadline`, `budget`, `priority`, `status`
+- `GET /api/projects` - Get all projects with filtering and pagination
+  - Query parameters: `page`, `limit`, `status`, `priority`, `search`
+- `GET /api/projects/stats` - Get project statistics for dashboard
+- `GET /api/projects/my-projects` - Get projects assigned to current user (Employee view)
+- `GET /api/projects/:projectId` - Get project details by ID
+- `PUT /api/projects/:projectId` - Update project (Admin/Manager only)
+- `DELETE /api/projects/:projectId` - Delete project (Admin/Manager only)
+
+### Project Assignment Endpoints
+
+#### Employee Assignment to Projects
+- `POST /api/project-assignments/assign` - Assign employee to project (Admin/Manager only)
+  - Body: `projectId`, `employeeId`, `role`
+- `GET /api/project-assignments/project/:projectId` - Get all employees assigned to a project
+- `GET /api/project-assignments/employee/:employeeId` - Get all projects assigned to an employee
+- `GET /api/project-assignments/project/:projectId/teammates` - Get teammates on same project
+- `PUT /api/project-assignments/:assignmentId/role` - Update assignment role (Admin/Manager only)
+- `DELETE /api/project-assignments/:assignmentId` - Remove employee from project (Admin/Manager only)
+
+### Task Management Endpoints
+
+#### Task CRUD Operations
+- `POST /api/tasks` - Create new task (Admin/Manager only)
+  - Body: `title`, `description`, `projectId`, `assignedTo`, `priority`, `status`, `startDate`, `dueDate`, `estimatedHours`
+- `GET /api/tasks` - Get all tasks with filtering
+  - Query parameters: `page`, `limit`, `projectId`, `status`, `priority`, `assignedTo`
+- `GET /api/tasks/my-tasks` - Get tasks assigned to current user
+  - Query parameters: `status`, `priority`
+- `GET /api/tasks/project/:projectId` - Get all tasks for a specific project
+- `GET /api/tasks/:taskId` - Get task details by ID
+- `PUT /api/tasks/:taskId` - Update task
+  - Employees can only update their own tasks (`status`, `actualHours`)
+  - Managers can update all fields
+- `DELETE /api/tasks/:taskId` - Delete task (Admin/Manager only)
+
+### Payment Management Endpoints
+
+#### Payment Operations
+- `POST /api/payments` - Create payment record (Admin/Manager only)
+  - Body: `employeeId`, `projectId`, `amount`, `paymentType`, `paymentMethod`, `status`, `paymentDate`, `dueDate`, `description`, `transactionId`
+- `GET /api/payments` - Get all payments with filtering (Admin/Manager only)
+  - Query parameters: `page`, `limit`, `employeeId`, `projectId`, `status`, `paymentType`, `startDate`, `endDate`
+- `GET /api/payments/stats` - Get payment statistics (Admin/Manager only)
+  - Query parameters: `startDate`, `endDate`
+- `GET /api/payments/my-payments` - Get payments for current user (Employee view)
+  - Query parameters: `status`, `paymentType`
+- `GET /api/payments/project/:projectId` - Get all payments for a project
+- `GET /api/payments/:paymentId` - Get payment details by ID
+- `PUT /api/payments/:paymentId` - Update payment (Admin/Manager only)
+- `DELETE /api/payments/:paymentId` - Delete payment (Admin only)
+
+### Message/Communication Endpoints
+
+#### Team Discussions and Comments
+- `POST /api/messages` - Send a new message
+  - Body: `content`, `receiverId` (for direct), `projectId` (for project), `taskId` (for task), `messageType`, `mentions`
+  - Message types: `direct`, `project`, `task`, `announcement`
+- `GET /api/messages` - Get messages with filtering
+  - Query parameters: `page`, `limit`, `projectId`, `taskId`, `messageType`
+- `GET /api/messages/unread-count` - Get unread message count
+- `GET /api/messages/conversation/:userId` - Get conversation between current user and another user
+- `GET /api/messages/project/:projectId` - Get all messages for a project
+- `GET /api/messages/task/:taskId` - Get all messages/comments for a task
+- `PUT /api/messages/:messageId/read` - Mark message as read
+- `DELETE /api/messages/:messageId` - Delete own message
+
+### Notification Endpoints
+
+#### System Notifications
+- `GET /api/notifications` - Get all notifications for current user
+  - Query parameters: `page`, `limit`, `type`, `isRead`, `priority`
+  - Types: `task_assignment`, `project_assignment`, `deadline_reminder`, `payment`, `general`, `system`
+- `GET /api/notifications/unread-count` - Get unread notification count
+- `POST /api/notifications` - Create notification (Admin/Manager only)
+  - Body: `userId`, `title`, `message`, `type`, `priority`, `relatedId`, `relatedType`
+- `POST /api/notifications/broadcast` - Send notification to multiple users (Admin/Manager only)
+  - Body: `userIds[]`, `title`, `message`, `type`, `priority`
+- `PUT /api/notifications/:notificationId/read` - Mark notification as read
+- `PUT /api/notifications/mark-all-read` - Mark all notifications as read
+- `DELETE /api/notifications/:notificationId` - Delete notification
+- `DELETE /api/notifications/read/all` - Delete all read notifications
 
 ### Health Check
 - `GET /api/health` - Server health status
