@@ -830,6 +830,179 @@ const handleRequestRevision = async (req, res) => {
   }
 };
 
+// Get all assignments for the logged-in employee
+const handleGetMyAssignments = async (req, res) => {
+  try {
+    const employeeId = req.user.id;
+    const { status, workStatus } = req.query;
+
+    // Build query conditions
+    const whereConditions = {
+      employeeId,
+      isActive: true
+    };
+
+    if (status) {
+      whereConditions.assignmentStatus = status;
+    }
+
+    if (workStatus) {
+      whereConditions.workStatus = workStatus;
+    }
+
+    const assignments = await ProjectAssignment.findAll({
+      where: whereConditions,
+      include: [
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name', 'description', 'status', 'priority', 'deadline', 'budget', 'category']
+        },
+        {
+          model: User,
+          as: 'assigner',
+          attributes: ['id', 'fullName', 'email', 'profileImage']
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    // Separate assignments by status
+    const pending = assignments.filter(a => a.assignmentStatus === 'pending');
+    const accepted = assignments.filter(a => a.assignmentStatus === 'accepted');
+    const rejected = assignments.filter(a => a.assignmentStatus === 'rejected');
+
+    res.json({
+      success: true,
+      message: "Assignments retrieved successfully",
+      summary: {
+        total: assignments.length,
+        pending: pending.length,
+        accepted: accepted.length,
+        rejected: rejected.length
+      },
+      assignments: {
+        all: assignments,
+        pending,
+        accepted,
+        rejected
+      }
+    });
+
+  } catch (error) {
+    console.error("Get my assignments error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
+// Get a specific assignment by ID for the logged-in employee
+const handleGetMyAssignmentById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const employeeId = req.user.id;
+
+    const assignment = await ProjectAssignment.findOne({
+      where: { 
+        id,
+        employeeId,
+        isActive: true
+      },
+      include: [
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name', 'description', 'status', 'priority', 'startDate', 'deadline', 'budget', 'category', 'projectType', 'technologies', 'frameworks']
+        },
+        {
+          model: User,
+          as: 'assigner',
+          attributes: ['id', 'fullName', 'email', 'phone', 'profileImage', 'role']
+        }
+      ]
+    });
+
+    if (!assignment) {
+      return res.status(404).json({
+        success: false,
+        message: "Assignment not found or you don't have access to it"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Assignment retrieved successfully",
+      assignment
+    });
+
+  } catch (error) {
+    console.error("Get assignment by ID error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
+// Get only pending assignments for the logged-in employee
+const handleGetPendingAssignments = async (req, res) => {
+  try {
+    const employeeId = req.user.id;
+
+    const pendingAssignments = await ProjectAssignment.findAll({
+      where: {
+        employeeId,
+        assignmentStatus: 'pending',
+        isActive: true
+      },
+      include: [
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name', 'description', 'status', 'priority', 'deadline', 'budget', 'category', 'projectType']
+        },
+        {
+          model: User,
+          as: 'assigner',
+          attributes: ['id', 'fullName', 'email', 'profileImage']
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    // Check for expired response deadlines
+    const now = new Date();
+    const expiredAssignments = pendingAssignments.filter(a => 
+      a.responseDeadline && new Date(a.responseDeadline) < now
+    );
+
+    res.json({
+      success: true,
+      message: "Pending assignments retrieved successfully",
+      count: pendingAssignments.length,
+      expiredCount: expiredAssignments.length,
+      assignments: pendingAssignments,
+      expiredAssignments: expiredAssignments.map(a => ({
+        id: a.id,
+        projectName: a.project?.name,
+        responseDeadline: a.responseDeadline
+      }))
+    });
+
+  } catch (error) {
+    console.error("Get pending assignments error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   handleAssignEmployeeToProject,
   handleGetProjectAssignments,
@@ -842,4 +1015,7 @@ module.exports = {
   handleVerifyWork,
   handleRejectWork,
   handleRequestRevision,
+  handleGetMyAssignments,
+  handleGetMyAssignmentById,
+  handleGetPendingAssignments,
 };

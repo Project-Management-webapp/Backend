@@ -168,7 +168,7 @@ const ProjectAssignment = sequelize.define('ProjectAssignment', {
     comment: 'Array of actual submitted deliverables [{name, url, submittedAt}]'
   },
   responsibilities: {
-    type: DataTypes.TEXT,
+    type: DataTypes.JSON,
     allowNull: true,
     comment: 'Specific responsibilities assigned to this employee'
   },
