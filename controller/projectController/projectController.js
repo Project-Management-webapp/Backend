@@ -100,7 +100,6 @@ const handleCreateProject = async (req, res) => {
       // Basic Information
       name,
       description: description || null,
-      projectCode: finalProjectCode,
       projectType: projectType || 'web_development',
       category: category || null,
       
@@ -114,7 +113,6 @@ const handleCreateProject = async (req, res) => {
       
       // Status and Progress
       status: status || 'pending',
-      completionPercentage: completionPercentage || 0,
       priority: priority || 'medium',
       
       // Financial Information
@@ -142,7 +140,6 @@ const handleCreateProject = async (req, res) => {
       // Repository and Version Control
       repositoryUrl: repositoryUrl || null,
       repositoryType: repositoryType || null,
-      branchName: branchName || 'main',
       
       // Reference Links
       productionUrl: productionUrl || null,
@@ -157,11 +154,7 @@ const handleCreateProject = async (req, res) => {
       
 
       
-      // Project Management
-      methodology: methodology || 'agile',
-      sprintDuration: sprintDuration || null,
-      currentSprint: currentSprint || 0,
-      totalSprints: totalSprints || null,
+      // Project Managemen
       milestones: milestones || null,
       
       // Risks and Issues
@@ -179,24 +172,11 @@ const handleCreateProject = async (req, res) => {
       deploymentFrequency: deploymentFrequency || null,
       cicdPipeline: cicdPipeline || null,
       
-      // Security
-      securityAuditStatus: securityAuditStatus || null,
-      securityAuditDate: securityAuditDate || null,
-      complianceRequirements: complianceRequirements || null,
-      
-      // Performance Metrics
-      performanceMetrics: performanceMetrics || null,
-      
-      // Tags and Labels
-      tags: tags || null,
-      labels: labels || null,
-      
+  
+    
       // Additional Information
       notes: notes || null,
-      objectives: objectives || null,
-      deliverables: deliverables || null,
-      successCriteria: successCriteria || null,
-      lessonsLearned: lessonsLearned || null,
+  
       
       // Team Information
       teamSize: teamSize || null,
@@ -204,7 +184,6 @@ const handleCreateProject = async (req, res) => {
       
       // Visibility and Access
       visibility: visibility || 'internal',
-      isArchived: isArchived || false,
       
       // Creator
       createdBy
@@ -280,7 +259,6 @@ const handleGetAllProjects = async (req, res) => {
       message: "Projects retrieved successfully",
       data: {
         projects,
-        total: projects.count
       }
     });
 
