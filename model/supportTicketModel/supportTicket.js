@@ -51,7 +51,7 @@ const SupportTicket = sequelize.define('SupportTicket', {
     defaultValue: 'medium',
   },
   status: {
-    type: DataTypes.ENUM('open', 'in_progress', 'resolved', 'closed', 'reopened'),
+    type: DataTypes.ENUM('open', 'in_progress', 'resolved', 'closed'),
     allowNull: false,
     defaultValue: 'open',
   },
@@ -60,111 +60,30 @@ const SupportTicket = sequelize.define('SupportTicket', {
     allowNull: true,
     comment: 'Array of attachment files [{name, url, type, size, uploadedAt}]'
   },
-  assignedTo: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'users',
-      key: 'id',
-    },
-    comment: 'Admin or Manager assigned to handle this ticket'
-  },
-  responses: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    comment: 'Array of responses [{userId, userName, message, timestamp, isInternal}]'
-  },
-  internalNotes: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: 'Internal notes visible only to admin/manager'
-  },
-  resolution: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: 'Final resolution description'
-  },
   resolvedAt: {
     type: DataTypes.DATE,
     allowNull: true,
   },
-  resolvedBy: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'users',
-      key: 'id',
-    },
-  },
-  closedAt: {
+    lastResponseAt: {
     type: DataTypes.DATE,
     allowNull: true,
   },
-  closedBy: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'users',
-      key: 'id',
-    },
-  },
-  reopenedAt: {
+    closedAt: {
     type: DataTypes.DATE,
     allowNull: true,
   },
-  reopenReason: {
+  response:{
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
+    message:{
     type: DataTypes.TEXT,
     allowNull: true,
   },
-  lastResponseAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    comment: 'Timestamp of last response for sorting'
-  },
-  relatedProjectId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'projects',
-      key: 'id',
-    },
-    comment: 'Related project if ticket is project-specific'
-  },
-  relatedPaymentId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'payments',
-      key: 'id',
-    },
-    comment: 'Related payment if ticket is payment-specific'
-  },
-  satisfactionRating: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    validate: {
-      min: 1,
-      max: 5,
-    },
-    comment: 'Employee satisfaction rating (1-5 stars)'
-  },
-  satisfactionFeedback: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-  },
+
 }, {
   tableName: 'support_tickets',
   timestamps: true,
-  underscored: true,
-  indexes: [
-    { fields: ['ticketId'] },
-    { fields: ['employeeId'] },
-    { fields: ['assignedTo'] },
-    { fields: ['status'] },
-    { fields: ['priority'] },
-    { fields: ['category'] },
-    { fields: ['createdAt'] },
-  ]
 });
 
 module.exports = SupportTicket;

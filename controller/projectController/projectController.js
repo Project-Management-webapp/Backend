@@ -1,7 +1,6 @@
 const Project = require('../../model/projectModel/project');
 const ProjectAssignment = require('../../model/projectAssignmentModel/projectAssignment');
 const User = require('../../model/userModel/user');
-const Task = require('../../model/taskModel/task');
 const { Op } = require('sequelize');
 
 const handleCreateProject = async (req, res) => {

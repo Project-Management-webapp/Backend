@@ -19,8 +19,6 @@ const handleSendMessage = async (req, res) => {
       });
     }
 
-
-
     if (!projectId) {
       return res.status(400).json({
         success: false,
@@ -28,10 +26,23 @@ const handleSendMessage = async (req, res) => {
       });
     }
 
+    // Handle file attachments from Cloudinary upload
+    let attachments = [];
+    if (req.files && req.files.length > 0) {
+      attachments = req.files.map(file => ({
+        name: file.originalname,
+        url: file.path, // Cloudinary URL
+        type: file.mimetype,
+        size: file.size,
+        cloudinaryId: file.filename
+      }));
+    }
+
     const newMessage = await Message.create({
       content,
       senderId,
       projectId,
+      attachments: attachments.length > 0 ? attachments : null,
     });
 
     const messageWithDetails = await Message.findOne({
@@ -53,7 +64,8 @@ const handleSendMessage = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Message sent successfully",
-      data: messageWithDetails
+      data: messageWithDetails,
+      attachmentsCount: attachments.length
     });
 
   } catch (error) {

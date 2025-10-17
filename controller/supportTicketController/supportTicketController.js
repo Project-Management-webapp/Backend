@@ -20,9 +20,6 @@ async function handleCreateTicket(req, res) {
       description,
       category,
       priority,
-      attachments,
-      relatedProjectId,
-      relatedPaymentId
     } = req.body;
 
     // Validate required fields
@@ -31,6 +28,18 @@ async function handleCreateTicket(req, res) {
         success: false,
         message: 'Subject and description are required'
       });
+    }
+
+    // Handle file attachments from Cloudinary upload
+    let attachments = [];
+    if (req.files && req.files.length > 0) {
+      attachments = req.files.map(file => ({
+        name: file.originalname,
+        url: file.path, // Cloudinary URL
+        type: file.mimetype,
+        size: file.size,
+        cloudinaryId: file.filename
+      }));
     }
 
     // Generate unique ticket ID
@@ -44,9 +53,7 @@ async function handleCreateTicket(req, res) {
       description,
       category: category || 'other',
       priority: priority || 'medium',
-      attachments,
-      relatedProjectId,
-      relatedPaymentId,
+      attachments: attachments.length > 0 ? attachments : null,
       status: 'open',
     });
 
@@ -81,7 +88,7 @@ async function handleCreateTicket(req, res) {
         {
           model: Project,
           as: 'relatedProject',
-          attributes: ['id', 'name', 'projectCode']
+          attributes: ['id', 'name']
         }
       ]
     });
@@ -90,6 +97,7 @@ async function handleCreateTicket(req, res) {
       success: true,
       message: 'Support ticket created successfully',
       ticket: createdTicket,
+      attachmentsCount: attachments.length
     });
   } catch (error) {
     console.error('Error creating support ticket:', error);
@@ -109,8 +117,6 @@ async function handleGetMyTickets(req, res) {
       status,
       category,
       priority,
-      page = 1,
-      limit = 10
     } = req.query;
 
     const whereClause = { employeeId };
@@ -125,9 +131,7 @@ async function handleGetMyTickets(req, res) {
       whereClause.priority = priority;
     }
 
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-
-    const { count, rows: tickets } = await SupportTicket.findAndCountAll({
+    const tickets = await SupportTicket.findAndCountAll({
       where: whereClause,
       include: [
         {
@@ -135,26 +139,14 @@ async function handleGetMyTickets(req, res) {
           as: 'assignedToUser',
           attributes: ['id', 'fullName', 'email', 'role', 'profileImage']
         },
-        {
-          model: User,
-          as: 'resolvedByUser',
-          attributes: ['id', 'fullName', 'role']
-        }
       ],
       order: [['createdAt', 'DESC']],
-      limit: parseInt(limit),
-      offset
     });
 
     res.json({
       success: true,
       tickets,
-      pagination: {
-        total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(count / parseInt(limit))
-      }
+      total: tickets.count,
     });
   } catch (error) {
     console.error('Error fetching tickets:', error);
@@ -181,11 +173,8 @@ async function handleGetAllTickets(req, res) {
       status,
       category,
       priority,
-      assignedTo,
       employeeId,
       search,
-      page = 1,
-      limit = 10
     } = req.query;
 
     const whereClause = {};
@@ -199,9 +188,6 @@ async function handleGetAllTickets(req, res) {
     if (priority) {
       whereClause.priority = priority;
     }
-    if (assignedTo) {
-      whereClause.assignedTo = assignedTo;
-    }
     if (employeeId) {
       whereClause.employeeId = employeeId;
     }
@@ -213,9 +199,7 @@ async function handleGetAllTickets(req, res) {
       ];
     }
 
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-
-    const { count, rows: tickets } = await SupportTicket.findAndCountAll({
+    const  tickets = await SupportTicket.findAndCountAll({
       where: whereClause,
       include: [
         {
@@ -223,23 +207,13 @@ async function handleGetAllTickets(req, res) {
           as: 'employee',
           attributes: ['id', 'fullName', 'email', 'employeeId', 'profileImage', 'department']
         },
-        {
-          model: User,
-          as: 'assignedToUser',
-          attributes: ['id', 'fullName', 'email', 'role', 'profileImage']
-        },
-        {
-          model: Project,
-          as: 'relatedProject',
-          attributes: ['id', 'name', 'projectCode']
-        }
+
       ],
       order: [
         ['priority', 'DESC'],
         ['createdAt', 'DESC']
       ],
-      limit: parseInt(limit),
-      offset
+
     });
 
     // Statistics
@@ -255,12 +229,7 @@ async function handleGetAllTickets(req, res) {
       success: true,
       tickets,
       stats,
-      pagination: {
-        total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(count / parseInt(limit))
-      }
+      total: tickets.count,
     });
   } catch (error) {
     console.error('Error fetching all tickets:', error);
@@ -285,31 +254,6 @@ async function handleGetTicketById(req, res) {
           model: User,
           as: 'employee',
           attributes: ['id', 'fullName', 'email', 'employeeId', 'profileImage', 'phone', 'department']
-        },
-        {
-          model: User,
-          as: 'assignedToUser',
-          attributes: ['id', 'fullName', 'email', 'role', 'profileImage']
-        },
-        {
-          model: User,
-          as: 'resolvedByUser',
-          attributes: ['id', 'fullName', 'role']
-        },
-        {
-          model: User,
-          as: 'closedByUser',
-          attributes: ['id', 'fullName', 'role']
-        },
-        {
-          model: Project,
-          as: 'relatedProject',
-          attributes: ['id', 'name', 'projectCode', 'status']
-        },
-        {
-          model: Payment,
-          as: 'relatedPayment',
-          attributes: ['id', 'amount', 'paymentType', 'status']
         }
       ]
     });
@@ -343,93 +287,12 @@ async function handleGetTicketById(req, res) {
   }
 }
 
-// Assign ticket to admin/manager
-async function handleAssignTicket(req, res) {
-  try {
-    const { id } = req.params;
-    const { assignedTo } = req.body;
-
-    // Only admin and manager can assign
-    if (!['admin', 'manager'].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
-    }
-
-    const ticket = await SupportTicket.findByPk(id);
-
-    if (!ticket) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ticket not found'
-      });
-    }
-
-    // Verify assignee is admin or manager
-    const assignee = await User.findByPk(assignedTo);
-    if (!assignee || !['admin', 'manager'].includes(assignee.role)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Can only assign to admin or manager'
-      });
-    }
-
-    ticket.assignedTo = assignedTo;
-    ticket.status = 'in_progress';
-    await ticket.save();
-
-    // Notify assignee
-    await Notification.create({
-      userId: assignedTo,
-      title: 'Ticket Assigned',
-      message: `You have been assigned ticket ${ticket.ticketId}: ${ticket.subject}`,
-      type: 'system',
-      relatedId: ticket.id,
-      relatedType: 'ticket',
-      priority: ticket.priority,
-    });
-
-    // Notify employee
-    await Notification.create({
-      userId: ticket.employeeId,
-      title: 'Ticket Update',
-      message: `Your ticket ${ticket.ticketId} has been assigned to ${assignee.fullName}`,
-      type: 'system',
-      relatedId: ticket.id,
-      relatedType: 'ticket',
-    });
-
-    const updatedTicket = await SupportTicket.findByPk(id, {
-      include: [
-        {
-          model: User,
-          as: 'assignedToUser',
-          attributes: ['id', 'fullName', 'email', 'role', 'profileImage']
-        }
-      ]
-    });
-
-    res.json({
-      success: true,
-      message: 'Ticket assigned successfully',
-      ticket: updatedTicket
-    });
-  } catch (error) {
-    console.error('Error assigning ticket:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to assign ticket',
-      error: error.message
-    });
-  }
-}
 
 // Add response to ticket
 async function handleAddResponse(req, res) {
   try {
     const { id } = req.params;
-    const { message, isInternal } = req.body;
+    const { message } = req.body;
     const userId = req.user.id;
     const userRole = req.user.role;
 
@@ -461,12 +324,24 @@ async function handleAddResponse(req, res) {
       attributes: ['id', 'fullName', 'role', 'profileImage']
     });
 
+    // Handle file attachments from Cloudinary upload
+    let attachments = [];
+    if (req.files && req.files.length > 0) {
+      attachments = req.files.map(file => ({
+        name: file.originalname,
+        url: file.path, // Cloudinary URL
+        type: file.mimetype,
+        size: file.size,
+        cloudinaryId: file.filename
+      }));
+    }
+
     const response = {
       userId,
       userName: user.fullName,
       userRole: user.role,
       message,
-      isInternal: isInternal || false,
+      attachments: attachments.length > 0 ? attachments : null,
       timestamp: new Date()
     };
 
@@ -477,36 +352,12 @@ async function handleAddResponse(req, res) {
     ticket.lastResponseAt = new Date();
     await ticket.save();
 
-    // Notify relevant parties
-    if (!isInternal) {
-      // If response is from staff, notify employee
-      if (['admin', 'manager'].includes(userRole)) {
-        await Notification.create({
-          userId: ticket.employeeId,
-          title: 'New Response to Your Ticket',
-          message: `${user.fullName} responded to ticket ${ticket.ticketId}`,
-          type: 'system',
-          relatedId: ticket.id,
-          relatedType: 'ticket',
-        });
-      }
-      // If response is from employee, notify assigned staff
-      else if (ticket.assignedTo) {
-        await Notification.create({
-          userId: ticket.assignedTo,
-          title: 'New Ticket Response',
-          message: `${user.fullName} responded to ticket ${ticket.ticketId}`,
-          type: 'system',
-          relatedId: ticket.id,
-          relatedType: 'ticket',
-        });
-      }
-    }
-
+  
     res.json({
       success: true,
       message: 'Response added successfully',
-      ticket
+      ticket,
+      attachmentsCount: attachments.length
     });
   } catch (error) {
     console.error('Error adding response:', error);
@@ -543,32 +394,17 @@ async function handleUpdateTicket(req, res) {
     }
 
     const {
-      status,
-      priority,
-      category,
-      resolution,
-      internalNotes,
-      satisfactionRating,
-      satisfactionFeedback
+      status
     } = req.body;
 
-    // Employee can only update satisfaction rating
-    if (userRole === 'employee' && ticket.employeeId === userId) {
-      if (satisfactionRating !== undefined) {
-        ticket.satisfactionRating = satisfactionRating;
-        ticket.satisfactionFeedback = satisfactionFeedback;
-      }
-    }
+
     // Admin/Manager can update all fields
-    else if (['admin', 'manager'].includes(userRole)) {
+    if (['admin', 'manager'].includes(userRole)) {
       if (status) {
         ticket.status = status;
         
         if (status === 'resolved') {
           ticket.resolvedAt = new Date();
-          ticket.resolvedBy = userId;
-          if (resolution) ticket.resolution = resolution;
-
           // Notify employee
           await Notification.create({
             userId: ticket.employeeId,
@@ -580,14 +416,8 @@ async function handleUpdateTicket(req, res) {
           });
         } else if (status === 'closed') {
           ticket.closedAt = new Date();
-          ticket.closedBy = userId;
         }
       }
-
-      if (priority) ticket.priority = priority;
-      if (category) ticket.category = category;
-      if (resolution) ticket.resolution = resolution;
-      if (internalNotes) ticket.internalNotes = internalNotes;
     }
 
     await ticket.save();
@@ -599,11 +429,6 @@ async function handleUpdateTicket(req, res) {
           as: 'employee',
           attributes: ['id', 'fullName', 'email']
         },
-        {
-          model: User,
-          as: 'assignedToUser',
-          attributes: ['id', 'fullName', 'role']
-        }
       ]
     });
 
@@ -622,123 +447,14 @@ async function handleUpdateTicket(req, res) {
   }
 }
 
-// Close ticket
-async function handleCloseTicket(req, res) {
-  try {
-    const { id } = req.params;
 
-    // Only admin and manager can close tickets
-    if (!['admin', 'manager'].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
-    }
 
-    const ticket = await SupportTicket.findByPk(id);
-
-    if (!ticket) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ticket not found'
-      });
-    }
-
-    ticket.status = 'closed';
-    ticket.closedAt = new Date();
-    ticket.closedBy = req.user.id;
-    await ticket.save();
-
-    // Notify employee
-    await Notification.create({
-      userId: ticket.employeeId,
-      title: 'Ticket Closed',
-      message: `Your ticket ${ticket.ticketId} has been closed`,
-      type: 'system',
-      relatedId: ticket.id,
-      relatedType: 'ticket',
-    });
-
-    res.json({
-      success: true,
-      message: 'Ticket closed successfully',
-      ticket
-    });
-  } catch (error) {
-    console.error('Error closing ticket:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to close ticket',
-      error: error.message
-    });
-  }
-}
-
-// Reopen ticket
-async function handleReopenTicket(req, res) {
-  try {
-    const { id } = req.params;
-    const { reopenReason } = req.body;
-    const userId = req.user.id;
-
-    const ticket = await SupportTicket.findByPk(id);
-
-    if (!ticket) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ticket not found'
-      });
-    }
-
-    // Only employee who created ticket or admin/manager can reopen
-    if (ticket.employeeId !== userId && !['admin', 'manager'].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
-    }
-
-    ticket.status = 'reopened';
-    ticket.reopenedAt = new Date();
-    ticket.reopenReason = reopenReason;
-    await ticket.save();
-
-    // Notify assigned staff
-    if (ticket.assignedTo) {
-      await Notification.create({
-        userId: ticket.assignedTo,
-        title: 'Ticket Reopened',
-        message: `Ticket ${ticket.ticketId} has been reopened`,
-        type: 'system',
-        relatedId: ticket.id,
-        relatedType: 'ticket',
-        priority: 'high',
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Ticket reopened successfully',
-      ticket
-    });
-  } catch (error) {
-    console.error('Error reopening ticket:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to reopen ticket',
-      error: error.message
-    });
-  }
-}
 
 module.exports = {
   handleCreateTicket,
   handleGetMyTickets,
   handleGetAllTickets,
   handleGetTicketById,
-  handleAssignTicket,
   handleAddResponse,
   handleUpdateTicket,
-  handleCloseTicket,
-  handleReopenTicket,
 };

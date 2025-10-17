@@ -786,10 +786,8 @@ module.exports = {
   handleUpdatePayment,
   handleDeletePayment,
   handleGetMyPayments,
-  handleGetPaymentsByProject,
   handleRequestPayment,
   handleApprovePaymentRequest,
   handleRejectPaymentRequest,
   handleConfirmPaymentReceived,
-  handleGetEarningsReport,
 };

@@ -91,15 +91,6 @@ Message.belongsTo(Project, {
   as: 'project' 
 });
 
-Task.hasMany(Message, { 
-  foreignKey: 'taskId', 
-  as: 'messages' 
-});
-Message.belongsTo(Task, { 
-  foreignKey: 'taskId', 
-  as: 'task' 
-});
-
 // Payment associations
 User.hasMany(Payment, { 
   foreignKey: 'employeeId', 
