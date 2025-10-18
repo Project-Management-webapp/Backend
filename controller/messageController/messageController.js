@@ -78,110 +78,8 @@ const handleSendMessage = async (req, res) => {
   }
 };
 
-const handleGetMessages = async (req, res) => {
-  try {
-    const {  
-      projectId, 
-    } = req.query;
-
-    const userId = req.user.id;
-    const whereConditions = {};
-
-    if (projectId) {
-      whereConditions.projectId = projectId;
-    }
-
-    // If no specific filter, show direct messages to/from user
-    if (!projectId && !taskId && !messageType) {
-      whereConditions[Op.or] = [
-        { senderId: userId },
-        { receiverId: userId }
-      ];
-    }
 
 
-    const  messages  = await Message.findAndCountAll({
-      where: whereConditions,
-      include: [
-        {
-          model: User,
-          as: 'sender',
-          attributes: ['id', 'fullName', 'email', 'profileImage', 'position']
-        },
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name']
-        },
-    
-      ],
-
-      order: [['createdAt', 'DESC']]
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Messages retrieved successfully",
-      data: {
-        messages,
-        totalCount: messages.count
-      }
-    });
-
-  } catch (error) {
-    console.error("Get messages error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};
-
-// Get conversation between two users
-const handleGetConversation = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const currentUserId = req.user.id;
-
-    const messages = await Message.findAll({
-      where: {
-        [Op.or]: [
-          { senderId: currentUserId, receiverId: userId },
-          { senderId: userId, receiverId: currentUserId }
-        ],
-        messageType: 'direct'
-      },
-      include: [
-        {
-          model: User,
-          as: 'sender',
-          attributes: ['id', 'fullName', 'email', 'profileImage']
-        },
-        {
-          model: User,
-          as: 'receiver',
-          attributes: ['id', 'fullName', 'email', 'profileImage']
-        }
-      ],
-      order: [['createdAt', 'ASC']]
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Conversation retrieved successfully",
-      data: messages
-    });
-
-  } catch (error) {
-    console.error("Get conversation error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};
 
 // Get project messages
 const handleGetProjectMessages = async (req, res) => {
@@ -199,16 +97,50 @@ const handleGetProjectMessages = async (req, res) => {
     const messages = await Message.findAll({
       where: { 
         projectId,
-        messageType: 'project'
       },
       include: [
         {
           model: User,
           as: 'sender',
           attributes: ['id', 'fullName', 'email', 'profileImage', 'position']
+        },
+        {
+          model: Message,
+          as: 'parentMessage',
+          attributes: ['id', 'content', 'createdAt'],
+          include: [
+            {
+              model: User,
+              as: 'sender',
+              attributes: ['id', 'fullName', 'profileImage']
+            }
+          ]
+        },
+        {
+          model: Message,
+          as: 'replies',
+          attributes: ['id', 'content', 'senderId', 'createdAt'],
+          include: [
+            {
+              model: User,
+              as: 'sender',
+              attributes: ['id', 'fullName', 'profileImage']
+            }
+          ]
         }
       ],
       order: [['createdAt', 'ASC']]
+    });
+
+    // Format messages with reply counts
+    const formattedMessages = messages.map(message => {
+      const messageData = message.toJSON();
+      return {
+        ...messageData,
+        replyCount: messageData.replies ? messageData.replies.length : 0,
+        hasReplies: messageData.replies && messageData.replies.length > 0,
+        isReply: !!messageData.replyToMessageId
+      };
     });
 
     res.status(200).json({
@@ -219,7 +151,8 @@ const handleGetProjectMessages = async (req, res) => {
           id: project.id,
           name: project.name
         },
-        messages
+        messages: formattedMessages,
+        totalMessages: formattedMessages.length
       }
     });
 
@@ -343,9 +276,111 @@ const handleDeleteMessage = async (req, res) => {
   }
 };
 
+// Reply to a specific message
+const handleReplyToMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { content } = req.body;
+    const senderId = req.user.id;
+
+    if (!content) {
+      return res.status(400).json({
+        success: false,
+        message: "Reply content is required"
+      });
+    }
+
+    // Find the parent message
+    const parentMessage = await Message.findOne({
+      where: { id: messageId },
+      include: [
+        {
+          model: User,
+          as: 'sender',
+          attributes: ['id', 'fullName', 'email', 'profileImage']
+        },
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name']
+        }
+      ]
+    });
+
+    if (!parentMessage) {
+      return res.status(404).json({
+        success: false,
+        message: "Parent message not found"
+      });
+    }
+
+    // Handle file attachments from Cloudinary upload
+    let attachments = [];
+    if (req.files && req.files.length > 0) {
+      attachments = req.files.map(file => ({
+        name: file.originalname,
+        url: file.path, // Cloudinary URL
+        type: file.mimetype,
+        size: file.size,
+        cloudinaryId: file.filename
+      }));
+    }
+
+    // Create the reply message
+    const replyMessage = await Message.create({
+      content,
+      senderId,
+      projectId: parentMessage.projectId,
+      messageType: parentMessage.messageType,
+      replyToMessageId: messageId,
+      attachments: attachments.length > 0 ? attachments : null,
+    });
+
+    // Fetch the created reply with full details
+    const replyWithDetails = await Message.findOne({
+      where: { id: replyMessage.id },
+      include: [
+        {
+          model: User,
+          as: 'sender',
+          attributes: ['id', 'fullName', 'email', 'profileImage', 'position']
+        },
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name']
+        }
+      ]
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Reply sent successfully",
+      data: {
+        reply: replyWithDetails,
+        parentMessage: {
+          id: parentMessage.id,
+          content: parentMessage.content,
+          sender: parentMessage.sender
+        }
+      },
+      attachmentsCount: attachments.length
+    });
+
+  } catch (error) {
+    console.error("Reply to message error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   handleSendMessage,
   handleGetProjectMessages,
   handleUpdateMessage,
-  handleDeleteMessage
+  handleDeleteMessage,
+  handleReplyToMessage
 };

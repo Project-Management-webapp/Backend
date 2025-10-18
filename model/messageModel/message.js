@@ -11,9 +11,10 @@ const Message = sequelize.define('Message', {
     type: DataTypes.TEXT,
     allowNull: true,
   },
-   attachments: {
+  attachments: {
     type: DataTypes.JSON,
     allowNull: true,
+    comment: 'Array of file attachments [{name, url, type, size, cloudinaryId}]'
   },
   senderId: {
     type: DataTypes.INTEGER,
@@ -26,11 +27,30 @@ const Message = sequelize.define('Message', {
   projectId: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    unique: true,
     references: {
       model: 'projects',
       key: 'id',
     },
+  },
+  // Reply functionality
+  replyToMessageId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'messages',
+      key: 'id',
+    },
+    comment: 'ID of the message being replied to (for threaded conversations)'
+  },
+  isEdited: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    comment: 'Whether the message has been edited'
+  },
+  editedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: 'When the message was last edited'
   },
 }, {
   tableName: 'messages',

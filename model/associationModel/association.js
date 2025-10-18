@@ -91,6 +91,16 @@ Message.belongsTo(Project, {
   as: 'project' 
 });
 
+// Message self-referencing associations for replies
+Message.hasMany(Message, { 
+  foreignKey: 'replyToMessageId', 
+  as: 'replies' 
+});
+Message.belongsTo(Message, { 
+  foreignKey: 'replyToMessageId', 
+  as: 'parentMessage' 
+});
+
 // Payment associations
 User.hasMany(Payment, { 
   foreignKey: 'employeeId', 
