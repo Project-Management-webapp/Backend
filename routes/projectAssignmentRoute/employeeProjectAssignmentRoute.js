@@ -7,6 +7,9 @@ const {
   handleGetMyAssignments,
   handleGetMyAssignmentById,
   handleGetPendingAssignments,
+  handleGetOngoingProjects,
+  handleGetCompletedProjects,
+  handleGetAcceptedProjects,
 } = require("../../controller/projectAssignmentController/projectAssignmentController");
 const { authorizeRoles } = require("../../middleware/roleMiddleware");
 
@@ -19,11 +22,32 @@ router.get(
   handleGetMyAssignments
 );
 
-// Get only pending assignments
+// Get only pending assignments (need to accept/reject)
 router.get(
   "/pending",
   authorizeRoles(["employee"]),
   handleGetPendingAssignments
+);
+
+// Get ongoing projects (currently working on)
+router.get(
+  "/ongoing",
+  authorizeRoles(["employee"]),
+  handleGetOngoingProjects
+);
+
+// Get completed projects (verified work)
+router.get(
+  "/completed",
+  authorizeRoles(["employee"]),
+  handleGetCompletedProjects
+);
+
+// Get all accepted projects (both ongoing and completed)
+router.get(
+  "/accepted",
+  authorizeRoles(["employee"]),
+  handleGetAcceptedProjects
 );
 
 // Get a specific assignment by ID

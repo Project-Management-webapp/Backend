@@ -176,6 +176,8 @@ const ProjectAssignment = sequelize.define('ProjectAssignment', {
     type: DataTypes.TEXT,
     allowNull: true,
   },
+  
+  
 }, {
   tableName: 'project_assignments',
   timestamps: true,

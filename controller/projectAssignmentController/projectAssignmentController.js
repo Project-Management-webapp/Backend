@@ -1003,6 +1003,276 @@ const handleGetPendingAssignments = async (req, res) => {
   }
 };
 
+// Admin: Toggle assignment active status (disable/enable)
+const handleToggleAssignmentStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: "isActive must be a boolean value (true or false)"
+      });
+    }
+
+    const assignment = await ProjectAssignment.findByPk(id, {
+      include: [
+        {
+          model: User,
+          as: 'employee',
+          attributes: ['id', 'fullName', 'email']
+        },
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name']
+        }
+      ]
+    });
+
+    if (!assignment) {
+      return res.status(404).json({
+        success: false,
+        message: "Assignment not found"
+      });
+    }
+
+    assignment.isActive = isActive;
+    
+    await assignment.save();
+
+    // Create notification for employee
+    await Notification.create({
+      userId: assignment.employeeId,
+      type: isActive ? 'assignment_enabled' : 'assignment_disabled',
+      title: isActive ? 'Assignment Enabled' : 'Assignment Disabled',
+      message: isActive 
+        ? `Your assignment for project "${assignment.project.name}" has been re-enabled by admin.`
+        : `Your assignment for project "${assignment.project.name}" has been disabled. Reason: ${reason || 'Not specified'}`,
+      relatedId: assignment.id,
+      isRead: false
+    });
+
+    res.json({
+      success: true,
+      message: `Assignment ${isActive ? 'enabled' : 'disabled'} successfully`,
+      assignment: {
+        id: assignment.id,
+        projectId: assignment.projectId,
+        employeeId: assignment.employeeId,
+        isActive: assignment.isActive,
+      }
+    });
+
+  } catch (error) {
+    console.error("Toggle assignment status error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
+// Get ongoing projects for the logged-in employee (accepted and in progress)
+const handleGetOngoingProjects = async (req, res) => {
+  try {
+    const employeeId = req.user.id;
+
+    const ongoingAssignments = await ProjectAssignment.findAll({
+      where: {
+        employeeId,
+        assignmentStatus: 'accepted',
+        workStatus: ['in_progress', 'submitted', 'revision_required'],
+        isActive: true
+      },
+      include: [
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name', 'description', 'status', 'priority', 'deadline', 'budget', 'category']
+        },
+        {
+          model: User,
+          as: 'assigner',
+          attributes: ['id', 'fullName', 'email', 'profileImage']
+        }
+      ],
+      order: [['workStartedAt', 'DESC']]
+    });
+
+    // Calculate progress statistics
+    const totalAssignments = ongoingAssignments.length;
+    const inProgress = ongoingAssignments.filter(a => a.workStatus === 'in_progress').length;
+    const submitted = ongoingAssignments.filter(a => a.workStatus === 'submitted').length;
+    const needingRevision = ongoingAssignments.filter(a => a.workStatus === 'revision_required').length;
+    
+    // Calculate total allocated amount
+    const totalAllocated = ongoingAssignments.reduce((sum, a) => sum + (parseFloat(a.allocatedAmount) || 0), 0);
+
+    res.json({
+      success: true,
+      message: "Ongoing projects retrieved successfully",
+      summary: {
+        totalOngoing: totalAssignments,
+        inProgress,
+        submitted,
+        needingRevision,
+        totalAllocatedAmount: totalAllocated
+      },
+      projects: ongoingAssignments
+    });
+
+  } catch (error) {
+    console.error("Get ongoing projects error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
+// Get completed/verified projects for the logged-in employee
+const   handleGetCompletedProjects = async (req, res) => {
+  try {
+    const employeeId = req.user.id;
+
+    const completedAssignments = await ProjectAssignment.findAll({
+      where: {
+        employeeId,
+        assignmentStatus: 'accepted',
+        workStatus: 'verified',
+        isActive: true
+      },
+      include: [
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name', 'description', 'status', 'priority', 'deadline', 'budget', 'category']
+        },
+        {
+          model: User,
+          as: 'assigner',
+          attributes: ['id', 'fullName', 'email', 'profileImage']
+        },
+        {
+          model: User,
+          as: 'verifier',
+          attributes: ['id', 'fullName', 'email', 'profileImage']
+        }
+      ],
+      order: [['workVerifiedAt', 'DESC']]
+    });
+
+    // Calculate statistics
+    const totalCompleted = completedAssignments.length;
+    const totalEarned = completedAssignments.reduce((sum, a) => sum + (parseFloat(a.allocatedAmount) || 0), 0);
+    
+    // Group by year and month
+    const completionsByMonth = {};
+    completedAssignments.forEach(assignment => {
+      if (assignment.workVerifiedAt) {
+        const date = new Date(assignment.workVerifiedAt);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        
+        if (!completionsByMonth[monthKey]) {
+          completionsByMonth[monthKey] = {
+            month: monthKey,
+            count: 0,
+            earned: 0
+          };
+        }
+        
+        completionsByMonth[monthKey].count++;
+        completionsByMonth[monthKey].earned += parseFloat(assignment.allocatedAmount) || 0;
+      }
+    });
+
+    res.json({
+      success: true,
+      message: "Completed projects retrieved successfully",
+      summary: {
+        totalCompleted,
+        totalEarned,
+        averagePerProject: totalCompleted > 0 ? (totalEarned / totalCompleted).toFixed(2) : 0
+      },
+      completionsByMonth: Object.values(completionsByMonth),
+      projects: completedAssignments
+    });
+
+  } catch (error) {
+    console.error("Get completed projects error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
+// Get all accepted projects (both ongoing and completed)
+const handleGetAcceptedProjects = async (req, res) => {
+  try {
+    const employeeId = req.user.id;
+
+    const acceptedAssignments = await ProjectAssignment.findAll({
+      where: {
+        employeeId,
+        assignmentStatus: 'accepted',
+        isActive: true
+      },
+      include: [
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name', 'description', 'status', 'priority', 'deadline', 'budget', 'category']
+        },
+        {
+          model: User,
+          as: 'assigner',
+          attributes: ['id', 'fullName', 'email', 'profileImage']
+        }
+      ],
+      order: [['acceptedAt', 'DESC']]
+    });
+
+    // Categorize by work status
+    const notStarted = acceptedAssignments.filter(a => a.workStatus === 'not_started');
+    const ongoing = acceptedAssignments.filter(a => ['in_progress', 'submitted', 'revision_required'].includes(a.workStatus));
+    const completed = acceptedAssignments.filter(a => a.workStatus === 'verified');
+    const rejected = acceptedAssignments.filter(a => a.workStatus === 'rejected');
+
+    res.json({
+      success: true,
+      message: "Accepted projects retrieved successfully",
+      summary: {
+        total: acceptedAssignments.length,
+        notStarted: notStarted.length,
+        ongoing: ongoing.length,
+        completed: completed.length,
+        rejected: rejected.length
+      },
+      projects: {
+        all: acceptedAssignments,
+        notStarted,
+        ongoing,
+        completed,
+        rejected
+      }
+    });
+
+  } catch (error) {
+    console.error("Get accepted projects error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   handleAssignEmployeeToProject,
   handleGetProjectAssignments,
@@ -1018,4 +1288,8 @@ module.exports = {
   handleGetMyAssignments,
   handleGetMyAssignmentById,
   handleGetPendingAssignments,
+  handleGetOngoingProjects,
+  handleGetCompletedProjects,
+  handleGetAcceptedProjects,
+  handleToggleAssignmentStatus,
 };

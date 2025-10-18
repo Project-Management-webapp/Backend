@@ -39,6 +39,7 @@ const managerProjectRoutes = require("./routes/projectRoute/managerProjectRoute"
 const employeeProjectRoutes = require("./routes/projectRoute/employeeProjectRoute");
 const managerProjectAssignmentRoutes = require("./routes/projectAssignmentRoute/managerProjectAssignmentRoute");
 const employeeProjectAssignmentRoutes = require("./routes/projectAssignmentRoute/employeeProjectAssignmentRoute");
+const adminProjectAssignmentRoutes = require("./routes/projectAssignmentRoute/adminProjectAssignmentRoute");
 const managerPaymentRoutes = require("./routes/paymentRoute/managerPaymentRoute");
 const employeePaymentRoutes = require("./routes/paymentRoute/employeePaymentRoute");
 const messageRoutes = require("./routes/messageRoute/messageRoute");
@@ -81,7 +82,8 @@ app.use(
 app.use(
   "/api/manager/project-assignments",
   checkForAuthenticationCookie("token"),
-  managerProjectAssignmentRoutes
+  managerProjectAssignmentRoutes,
+  adminProjectAssignmentRoutes
 );
 
 // Employee Project Assignment Routes
@@ -90,6 +92,8 @@ app.use(
   checkForAuthenticationCookie("token"),
   employeeProjectAssignmentRoutes
 );
+
+
 
 // Manager/Admin Payment Routes
 app.use(
