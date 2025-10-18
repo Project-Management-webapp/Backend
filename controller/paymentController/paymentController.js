@@ -2,130 +2,8 @@ const Payment = require('../../model/paymentModel/payment');
 const User = require('../../model/userModel/user');
 const Project = require('../../model/projectModel/project');
 const Notification = require('../../model/notificationModel/notification');
+  const ProjectAssignment = require('../../model/projectAssignmentModel/projectAssignment');
 const { Op } = require('sequelize');
-
-const handleCreatePayment = async (req, res) => {
-  try {
-    const {
-      employeeId,
-      projectId,
-      amount,
-      paymentType,
-      paymentMethod,
-      status,
-      paymentDate,
-      dueDate,
-      description,
-      transactionId,
-      transactionProofLink,
-      proofOfPayment,
-      currency
-    } = req.body;
-
-    const processedBy = req.user.id;
-
-    // Validation: Employee ID, amount, and payment proof are required
-    if (!employeeId || !amount) {
-      return res.status(400).json({
-        success: false,
-        message: "Employee ID and amount are required"
-      });
-    }
-
-    if (!transactionId && !transactionProofLink && !proofOfPayment) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment proof is required (provide transactionId, transactionProofLink, or proofOfPayment)"
-      });
-    }
-
-    // Check if employee exists
-    const employee = await User.findByPk(employeeId);
-    if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: "Employee not found"
-      });
-    }
-
-    // Check if project exists (if projectId provided)
-    if (projectId) {
-      const project = await Project.findByPk(projectId);
-      if (!project) {
-        return res.status(404).json({
-          success: false,
-          message: "Project not found"
-        });
-      }
-    }
-
-    const newPayment = await Payment.create({
-      employeeId,
-      projectId,
-      amount,
-      paymentType: paymentType || 'project_payment',
-      paymentMethod: paymentMethod || 'bank_transfer',
-      status: status || 'completed',
-      requestStatus: 'paid',
-      paymentDate: paymentDate || new Date(),
-      dueDate,
-      description,
-      transactionId,
-      transactionProofLink,
-      proofOfPayment,
-      currency: currency || 'USD',
-      processedBy,
-      approvedBy: processedBy,
-      approvedAt: new Date()
-    });
-
-    // Create notification for employee
-    await Notification.create({
-      userId: employeeId,
-      title: 'Payment Processed',
-      message: `A payment of ${amount} ${currency || 'USD'} has been processed for you. Please confirm receipt.`,
-      type: 'payment',
-      relatedId: newPayment.id,
-      relatedType: 'payment',
-      priority: 'high'
-    });
-
-    const paymentWithDetails = await Payment.findOne({
-      where: { id: newPayment.id },
-      include: [
-        {
-          model: User,
-          as: 'employee',
-          attributes: ['id', 'fullName', 'email', 'position']
-        },
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name']
-        },
-        {
-          model: User,
-          as: 'processor',
-          attributes: ['id', 'fullName', 'email']
-        }
-      ]
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "Payment created successfully with proof. Waiting for employee confirmation.",
-      data: paymentWithDetails
-    });
-
-  } catch (error) {
-    console.error("Create payment error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};;
 
 // Get all payments with filtering
 const handleGetAllPayments = async (req, res) => {
@@ -147,7 +25,7 @@ const handleGetAllPayments = async (req, res) => {
     if (paymentType) whereConditions.paymentType = paymentType;
     
     if (startDate && endDate) {
-      whereConditions.paymentDate = {
+      whereConditions.createdAt = {
         [Op.between]: [startDate, endDate]
       };
     }
@@ -169,7 +47,7 @@ const handleGetAllPayments = async (req, res) => {
         },
         {
           model: User,
-          as: 'processor',
+          as: 'manager',
           attributes: ['id', 'fullName', 'email']
         }
       ],
@@ -216,7 +94,7 @@ const handleGetPaymentById = async (req, res) => {
         },
         {
           model: User,
-          as: 'processor',
+          as: 'manager',
           attributes: ['id', 'fullName', 'email']
         }
       ]
@@ -255,116 +133,6 @@ const handleGetPaymentById = async (req, res) => {
   }
 };
 
-const handleUpdatePayment = async (req, res) => {
-  try {
-    const { paymentId } = req.params;
-    const {
-      amount,
-      paymentType,
-      paymentMethod,
-      status,
-      paymentDate,
-      dueDate,
-      description,
-      transactionId
-    } = req.body;
-
-    const payment = await Payment.findByPk(paymentId);
-
-    if (!payment) {
-      return res.status(404).json({
-        success: false,
-        message: "Payment not found"
-      });
-    }
-
-    const updateData = {};
-    if (amount !== undefined) updateData.amount = amount;
-    if (paymentType !== undefined) updateData.paymentType = paymentType;
-    if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
-    if (status !== undefined) updateData.status = status;
-    if (paymentDate !== undefined) updateData.paymentDate = paymentDate;
-    if (dueDate !== undefined) updateData.dueDate = dueDate;
-    if (description !== undefined) updateData.description = description;
-    if (transactionId !== undefined) updateData.transactionId = transactionId;
-
-    await payment.update(updateData);
-
-    // Notify employee if status changed to completed
-    if (status === 'completed' && payment.status !== 'completed') {
-      await Notification.create({
-        userId: payment.employeeId,
-        title: 'Payment Completed',
-        message: `Your payment of ${payment.amount} has been processed successfully`,
-        type: 'payment',
-        relatedId: paymentId,
-        relatedType: 'payment',
-        priority: 'high'
-      });
-    }
-
-    const updatedPayment = await Payment.findOne({
-      where: { id: paymentId },
-      include: [
-        {
-          model: User,
-          as: 'employee',
-          attributes: ['id', 'fullName', 'email']
-        },
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name']
-        }
-      ]
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Payment updated successfully",
-      data: updatedPayment
-    });
-
-  } catch (error) {
-    console.error("Update payment error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};
-
-const handleDeletePayment = async (req, res) => {
-  try {
-    const { paymentId } = req.params;
-
-    const payment = await Payment.findByPk(paymentId);
-
-    if (!payment) {
-      return res.status(404).json({
-        success: false,
-        message: "Payment not found"
-      });
-    }
-
-    await payment.destroy();
-
-    res.status(200).json({
-      success: true,
-      message: "Payment deleted successfully"
-    });
-
-  } catch (error) {
-    console.error("Delete payment error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};
-
 // Get employee payments (Employee view)
 const handleGetMyPayments = async (req, res) => {
   try {
@@ -388,11 +156,11 @@ const handleGetMyPayments = async (req, res) => {
         },
         {
           model: User,
-          as: 'processor',
+          as: 'manager',
           attributes: ['id', 'fullName', 'email']
         }
       ],
-      order: [['paymentDate', 'DESC']]
+      order: [['createdAt', 'DESC']]
     });
 
     // Calculate total earnings
@@ -434,7 +202,7 @@ const handleRequestPayment = async (req, res) => {
       });
     }
 
-    const ProjectAssignment = require('../../model/projectAssignmentModel/projectAssignment');
+  
     const assignment = await ProjectAssignment.findByPk(assignmentId, {
       include: [
         {
@@ -460,6 +228,15 @@ const handleRequestPayment = async (req, res) => {
       });
     }
 
+    // Check if work status is verified
+    if (assignment.workStatus !== 'verified') {
+      return res.status(400).json({
+        success: false,
+        message: `Payment request not allowed. Your work status is '${assignment.workStatus}'. Only verified work can request payment.`,
+        currentStatus: assignment.workStatus,
+        allowedStatus: 'verified'
+      });
+    }
 
     // Check if payment already exists for this assignment
     const existingPayment = await Payment.findOne({
@@ -522,23 +299,31 @@ const handleRequestPayment = async (req, res) => {
   }
 };
 
-const handleApprovePaymentRequest = async (req, res) => {
+const   handleApprovePaymentRequest = async (req, res) => {
   try {
     const { id } = req.params;
-    const { approvalNotes, scheduledDate } = req.body;
+    const { approvalNotes, transactionId, transactionProofLink } = req.body;
     const userId = req.user.id;
+
+    // Validation: Transaction proof is required
+    if (!transactionId && !transactionProofLink) {
+      return res.status(400).json({
+        success: false,
+        message: "Transaction proof is required (provide transactionId or transactionProofLink)"
+      });
+    }
 
     const payment = await Payment.findByPk(id, {
       include: [
         {
           model: User,
           as: 'employee',
-          attributes: ['id', 'fullName', 'email', 'bankAccountNumber', 'bankName']
+          attributes: ['id', 'fullName', 'email']
         },
         {
           model: Project,
           as: 'project',
-          attributes: ['id', 'name', 'projectCode']
+          attributes: ['id', 'name']
         }
       ]
     });
@@ -553,24 +338,25 @@ const handleApprovePaymentRequest = async (req, res) => {
     if (payment.requestStatus !== 'requested') {
       return res.status(400).json({
         success: false,
-        message: `Payment is already ${payment.requestStatus}`
+        message: `Payment is already ${payment.requestStatus}. Cannot approve again.`
       });
     }
 
-    // Update payment
-    payment.requestStatus = 'approved';
+    // Update payment - approve and mark as paid with transaction proof
+    payment.requestStatus = 'paid';
+    payment.status = 'completed';
     payment.approvedAt = new Date();
-    payment.approvedBy = userId;
+    payment.managerId = userId;
     payment.approvalNotes = approvalNotes;
-    payment.scheduledDate = scheduledDate || new Date();
-    payment.status = 'processing';
+    payment.transactionId = transactionId;
+    payment.transactionProofLink = transactionProofLink;
     await payment.save();
 
     // Notify employee
     await Notification.create({
       userId: payment.employeeId,
-      title: 'Payment Approved',
-      message: `Your payment request of ${payment.amount} ${payment.currency} for project ${payment.project.name} has been approved`,
+      title: 'Payment Processed',
+      message: `Your payment of ${payment.amount} ${payment.currency} for project "${payment.project.name}" has been processed. Please confirm receipt.`,
       type: 'payment',
       relatedId: payment.id,
       relatedType: 'payment',
@@ -579,7 +365,7 @@ const handleApprovePaymentRequest = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Payment approved successfully. Please upload payment proof after processing.",
+      message: "Payment approved and processed successfully with transaction proof. Waiting for employee confirmation.",
       payment
     });
 
@@ -685,7 +471,7 @@ const handleConfirmPaymentReceived = async (req, res) => {
         {
           model: Project,
           as: 'project',
-          attributes: ['id', 'name', 'projectCode', 'createdBy']
+          attributes: ['id', 'name', 'createdBy']
         }
       ]
     });
@@ -776,15 +562,11 @@ const handleConfirmPaymentReceived = async (req, res) => {
   }
 };
 
-// Get earnings report (Employee view)
 
 
 module.exports = {
-  handleCreatePayment,
   handleGetAllPayments,
   handleGetPaymentById,
-  handleUpdatePayment,
-  handleDeletePayment,
   handleGetMyPayments,
   handleRequestPayment,
   handleApprovePaymentRequest,

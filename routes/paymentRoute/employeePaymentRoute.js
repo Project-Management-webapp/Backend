@@ -17,3 +17,4 @@ router.post('/request', authorizeRoles(['employee']), handleRequestPayment);
 router.post('/:id/confirm', authorizeRoles(['employee']), handleConfirmPaymentReceived);
 
 module.exports = router;
+

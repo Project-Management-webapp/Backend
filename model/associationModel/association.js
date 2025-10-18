@@ -112,21 +112,12 @@ Payment.belongsTo(User, {
 });
 
 User.hasMany(Payment, { 
-  foreignKey: 'processedBy', 
-  as: 'processedPayments' 
+  foreignKey: 'managerId', 
+  as: 'managedPayments' 
 });
 Payment.belongsTo(User, { 
-  foreignKey: 'processedBy', 
-  as: 'processor' 
-});
-
-User.hasMany(Payment, { 
-  foreignKey: 'approvedBy', 
-  as: 'approvedPayments' 
-});
-Payment.belongsTo(User, { 
-  foreignKey: 'approvedBy', 
-  as: 'approver' 
+  foreignKey: 'managerId', 
+  as: 'manager' 
 });
 
 User.hasMany(Payment, { 

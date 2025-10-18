@@ -1,17 +1,14 @@
 const SupportTicket = require('../../model/supportTicketModel/supportTicket');
 const User = require('../../model/userModel/user');
 const Project = require('../../model/projectModel/project');
-const Payment = require('../../model/paymentModel/payment');
 const Notification = require('../../model/notificationModel/notification');
 const { Op } = require('sequelize');
 
-// Generate unique ticket ID
 const generateTicketId = async () => {
   const count = await SupportTicket.count();
   return `TICKET-${String(count + 1).padStart(5, '0')}`;
 };
 
-// Create a new support ticket
 async function handleCreateTicket(req, res) {
   try {
     const employeeId = req.user.id;
@@ -158,17 +155,8 @@ async function handleGetMyTickets(req, res) {
   }
 }
 
-// Get all tickets (admin/manager view)
 async function handleGetAllTickets(req, res) {
   try {
-    // Only admin and manager can access
-    if (!['admin', 'manager'].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Only admins and managers can view all tickets'
-      });
-    }
-
     const {
       status,
       category,
@@ -218,7 +206,7 @@ async function handleGetAllTickets(req, res) {
 
     // Statistics
     const stats = {
-      total: count,
+      total: tickets.count,
       open: await SupportTicket.count({ where: { status: 'open' } }),
       inProgress: await SupportTicket.count({ where: { status: 'in_progress' } }),
       resolved: await SupportTicket.count({ where: { status: 'resolved' } }),
@@ -288,13 +276,21 @@ async function handleGetTicketById(req, res) {
 }
 
 
-// Add response to ticket
+// Add response to ticket (Manager/Admin ONLY)
 async function handleAddResponse(req, res) {
   try {
     const { id } = req.params;
     const { message } = req.body;
     const userId = req.user.id;
     const userRole = req.user.role;
+
+    // Only managers/admins can add responses
+    if (!['admin', 'manager'].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Only managers and admins can respond to tickets.'
+      });
+    }
 
     if (!message) {
       return res.status(400).json({
@@ -309,14 +305,6 @@ async function handleAddResponse(req, res) {
       return res.status(404).json({
         success: false,
         message: 'Ticket not found'
-      });
-    }
-
-    // Check authorization
-    if (!['admin', 'manager'].includes(userRole) && ticket.employeeId !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
       });
     }
 
@@ -345,18 +333,48 @@ async function handleAddResponse(req, res) {
       timestamp: new Date()
     };
 
-    const responses = ticket.responses || [];
+    // Get existing responses array (field name is 'response' in model, not 'responses')
+    const responses = ticket.response || [];
     responses.push(response);
 
-    ticket.responses = responses;
+    // Update ticket with new response (use 'response' field name)
+    ticket.response = responses;
     ticket.lastResponseAt = new Date();
+    
+    // Auto-update status to in_progress if it was open
+    if (ticket.status === 'open') {
+      ticket.status = 'in_progress';
+    }
+    
     await ticket.save();
 
-  
+    // Notify employee about the response
+    await Notification.create({
+      userId: ticket.employeeId,
+      title: 'Support Ticket Response',
+      message: `You received a response on ticket ${ticket.ticketId}: ${ticket.subject}`,
+      type: 'system',
+      relatedId: ticket.id,
+      relatedType: 'ticket',
+      priority: ticket.priority
+    });
+
+    // Fetch updated ticket with employee details
+    const updatedTicket = await SupportTicket.findByPk(id, {
+      include: [
+        {
+          model: User,
+          as: 'employee',
+          attributes: ['id', 'fullName', 'email', 'employeeId', 'profileImage']
+        }
+      ]
+    });
+
     res.json({
       success: true,
       message: 'Response added successfully',
-      ticket,
+      ticket: updatedTicket,
+      totalResponses: updatedTicket.response ? updatedTicket.response.length : 0,
       attachmentsCount: attachments.length
     });
   } catch (error) {
@@ -369,12 +387,20 @@ async function handleAddResponse(req, res) {
   }
 }
 
-// Update ticket status/resolution
+// Update ticket status/resolution (Manager/Admin ONLY)
 async function handleUpdateTicket(req, res) {
   try {
     const { id } = req.params;
     const userId = req.user.id;
     const userRole = req.user.role;
+
+    // Only managers/admins can update tickets
+    if (!['admin', 'manager'].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Only managers and admins can update ticket status.'
+      });
+    }
 
     const ticket = await SupportTicket.findByPk(id);
 
@@ -385,39 +411,50 @@ async function handleUpdateTicket(req, res) {
       });
     }
 
-    // Check authorization
-    if (!['admin', 'manager'].includes(userRole) && ticket.employeeId !== userId) {
-      return res.status(403).json({
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({
         success: false,
-        message: 'Access denied'
+        message: 'Status is required'
       });
     }
 
-    const {
-      status
-    } = req.body;
+    // Validate status
+    const validStatuses = ['open', 'in_progress', 'resolved', 'closed'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status. Valid values are: ${validStatuses.join(', ')}`
+      });
+    }
 
-
-    // Admin/Manager can update all fields
-    if (['admin', 'manager'].includes(userRole)) {
-      if (status) {
-        ticket.status = status;
-        
-        if (status === 'resolved') {
-          ticket.resolvedAt = new Date();
-          // Notify employee
-          await Notification.create({
-            userId: ticket.employeeId,
-            title: 'Ticket Resolved',
-            message: `Your ticket ${ticket.ticketId} has been resolved`,
-            type: 'system',
-            relatedId: ticket.id,
-            relatedType: 'ticket',
-          });
-        } else if (status === 'closed') {
-          ticket.closedAt = new Date();
-        }
-      }
+    const oldStatus = ticket.status;
+    ticket.status = status;
+    
+    if (status === 'resolved' && oldStatus !== 'resolved') {
+      ticket.resolvedAt = new Date();
+      // Notify employee
+      await Notification.create({
+        userId: ticket.employeeId,
+        title: 'Ticket Resolved',
+        message: `Your ticket ${ticket.ticketId} has been resolved`,
+        type: 'system',
+        relatedId: ticket.id,
+        relatedType: 'ticket',
+        priority: 'high'
+      });
+    } else if (status === 'closed' && oldStatus !== 'closed') {
+      ticket.closedAt = new Date();
+      // Notify employee
+      await Notification.create({
+        userId: ticket.employeeId,
+        title: 'Ticket Closed',
+        message: `Your ticket ${ticket.ticketId} has been closed`,
+        type: 'system',
+        relatedId: ticket.id,
+        relatedType: 'ticket',
+      });
     }
 
     await ticket.save();
@@ -434,7 +471,7 @@ async function handleUpdateTicket(req, res) {
 
     res.json({
       success: true,
-      message: 'Ticket updated successfully',
+      message: `Ticket status updated from '${oldStatus}' to '${status}' successfully`,
       ticket: updatedTicket
     });
   } catch (error) {

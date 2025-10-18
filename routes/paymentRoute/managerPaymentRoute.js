@@ -1,9 +1,7 @@
 const express = require('express');
 const {
-  handleCreatePayment,
   handleGetAllPayments,
-  handleUpdatePayment,
-  handleDeletePayment,
+  handleGetPaymentById,
   handleApprovePaymentRequest,
   handleRejectPaymentRequest,
 } = require('../../controller/paymentController/paymentController');
@@ -11,13 +9,13 @@ const { authorizeRoles } = require('../../middleware/roleMiddleware');
 
 const router = express.Router();
 
-router.post('/', authorizeRoles(['manager']), handleCreatePayment);
+// View payments
 router.get('/', authorizeRoles(['manager']), handleGetAllPayments);
-router.put('/:paymentId', authorizeRoles(['manager']), handleUpdatePayment);
-router.delete('/:paymentId', authorizeRoles(['manager']), handleDeletePayment);
+router.get('/:paymentId', authorizeRoles(['manager']), handleGetPaymentById);
 
-// Payment workflow - Manager actions
+// Payment workflow - Manager actions (approve with transaction proof)
 router.post('/:id/approve', authorizeRoles(['manager']), handleApprovePaymentRequest);
 router.post('/:id/reject', authorizeRoles(['manager']), handleRejectPaymentRequest);
 
 module.exports = router;
+
