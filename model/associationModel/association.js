@@ -230,3 +230,5 @@ ProjectAssignment.belongsTo(User, {
   foreignKey: 'workVerifiedBy', 
   as: 'verifier' 
 });
+
+
