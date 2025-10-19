@@ -46,6 +46,8 @@ const messageRoutes = require("./routes/messageRoute/messageRoute");
 const notificationRoutes = require("./routes/notificationRoute/notificationRoute");
 const managerSupportTicketRoutes = require("./routes/supportTicketRoute/managerSupportTicketRoute");
 const employeeSupportTicketRoutes = require("./routes/supportTicketRoute/employeeSupportTicketRoute");
+const employeeStatsRoutes = require("./routes/statsRoute/employeeStatsRoute");
+const managerStatsRoutes = require("./routes/statsRoute/managerStatsRoute");
 const { checkForAuthenticationCookie } = require("./middleware/authMiddleware");
 
 app.use("/api/auth", employeeAuthRoutes, managerAuthRoutes, commonAuthRoutes);
@@ -130,6 +132,20 @@ app.use(
   employeeSupportTicketRoutes
 );
 
+// Employee Statistics Routes
+app.use(
+  "/api/employee/stats",
+  checkForAuthenticationCookie("token"),
+  employeeStatsRoutes
+);
+
+// Manager Statistics Routes
+app.use(
+  "/api/manager/stats",
+  checkForAuthenticationCookie("token"),
+  managerStatsRoutes
+);
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
@@ -139,3 +155,4 @@ initDB(() => {
     console.log(`Server is running on port ${PORT}`);
   });
 });
+ 
