@@ -17,17 +17,15 @@ const Project = sequelize.define('Project', {
     allowNull: true,
   },
   projectType: {
-    type: DataTypes.ENUM('web_development', 'mobile_app', 'desktop_app', 'api_development', 'saas', 'ecommerce', 'custom_software', 'maintenance', 'consulting', 'other'),
+    type: DataTypes.ENUM('quoted','time and materials','other'),
     allowNull: true,
-    defaultValue: 'web_development',
+    defaultValue: 'other',
   },
-  category: {
+  customProjectType: {
     type: DataTypes.STRING(100),
     allowNull: true,
-    comment: 'Project category or domain (e.g., Healthcare, Finance, Education)'
+    comment: 'Custom project type when projectType is "other"'
   },
-
-
   // Timeline Information
   startDate: {
     type: DataTypes.DATEONLY,
@@ -59,6 +57,15 @@ const Project = sequelize.define('Project', {
     defaultValue: 0.00,
     comment: 'Actual hours spent on project'
   },
+    estimatedConsumables: {
+    type: DataTypes.JSON,
+    allowNull: false,
+  },
+    actualConsumables: {
+    type: DataTypes.JSON,
+    allowNull: false,
+  },
+
   
   // Status and Progress
   status: {
@@ -100,108 +107,24 @@ const Project = sequelize.define('Project', {
     defaultValue: 'fixed_price',
   },
   // Client Information
-  clientName: {
-    type: DataTypes.STRING(100),
+  companyName: {
+    type: DataTypes.STRING(255),
     allowNull: true,
-    comment: 'Client or company name'
+    comment: 'company name'
   },
-  clientEmail: {
+  companyEmail: {
     type: DataTypes.STRING(100),
     allowNull: true,
     validate: {
       isEmail: true,
     },
   },
-  clientPhone: {
+  companyPhone: {
     type: DataTypes.STRING(20),
     allowNull: true,
   },
-  clientCompany: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-  },
-  // Technical Specifications
-  technologies: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    comment: 'Array of technologies used (e.g., ["React", "Node.js", "MongoDB"])'
-  },
-  frameworks: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    comment: 'Array of frameworks used'
-  },
-  programmingLanguages: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    comment: 'Array of programming languages'
-  },
-  database: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    comment: 'Database system used (e.g., MySQL, PostgreSQL, MongoDB)'
-  },
-  cloudProvider: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    comment: 'Cloud service provider (e.g., AWS, Azure, GCP)'
-  },
-  architecture: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    comment: 'System architecture (e.g., Microservices, Monolithic, Serverless)'
-  },
-  // Repository and Version Control
-  repositoryUrl: {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-    comment: 'Git repository URL (GitHub, GitLab, Bitbucket)'
-  },
-  repositoryType: {
-    type: DataTypes.ENUM('github', 'gitlab', 'bitbucket', 'azure_devops', 'other'),
-    allowNull: true,
-  },
-  // Reference Links
-  productionUrl: {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-    comment: 'Live production URL'
-  },
-  stagingUrl: {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-    comment: 'Staging environment URL'
-  },
-  developmentUrl: {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-    comment: 'Development environment URL'
-  },
-  documentationUrl: {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-    comment: 'Project documentation URL'
-  },
-  apiDocumentationUrl: {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-    comment: 'API documentation URL (Swagger, Postman)'
-  },
-  figmaUrl: {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-    comment: 'Figma design URL'
-  },
-  jiraUrl: {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-    comment: 'JIRA project URL'
-  },
-  slackChannel: {
-    type: DataTypes.STRING(200),
-    allowNull: true,
-    comment: 'Slack channel for project communication'
-  },
+
+
   referenceLinks: {
     type: DataTypes.JSON,
     allowNull: true,
@@ -232,38 +155,6 @@ const Project = sequelize.define('Project', {
     type: DataTypes.ENUM('not_started', 'in_progress', 'completed', 'failed'),
     allowNull: true,
   },
-  testCoverage: {
-    type: DataTypes.DECIMAL(5, 2),
-    allowNull: true,
-    comment: 'Test coverage percentage'
-  },
-  qaApprovalStatus: {
-    type: DataTypes.ENUM('pending', 'approved', 'rejected', 'not_required'),
-    allowNull: true,
-    defaultValue: 'pending',
-  },
-  
-  // Deployment Information
-  deploymentStatus: {
-    type: DataTypes.ENUM('not_deployed', 'dev', 'staging', 'production', 'all_environments'),
-    allowNull: true,
-  },
-  lastDeploymentDate: {
-    type: DataTypes.DATE,
-    allowNull: true,
-  },
-  deploymentFrequency: {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-    comment: 'e.g., Daily, Weekly, Bi-weekly'
-  },
-  cicdPipeline: {
-    type: DataTypes.STRING(200),
-    allowNull: true,
-    comment: 'CI/CD pipeline URL or name'
-  },
- 
-  
   // Additional Information
   notes: {
     type: DataTypes.TEXT,

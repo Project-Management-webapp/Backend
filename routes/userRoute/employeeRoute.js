@@ -1,5 +1,5 @@
 const express = require('express');
-const { handleEmployeeSignUp, handleEmployeeLogin, handleEmployeeLogout, handleEmployeeGetProfile, handleEmployeeUpdateProfile } = require('../../controller/userController/employeController');
+const { handleEmployeeSignUp, handleEmployeeLogin, handleEmployeeLogout } = require('../../controller/userController/employeController');
 const router = express.Router();
 
 

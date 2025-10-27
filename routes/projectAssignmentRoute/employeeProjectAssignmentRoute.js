@@ -1,35 +1,17 @@
 const express = require("express");
 const {
   handleGetProjectTeammates,
-  handleAcceptAssignment,
-  handleRejectAssignment,
-  handleSubmitWork,
   handleGetMyAssignments,
   handleGetMyAssignmentById,
-  handleGetPendingAssignments,
   handleGetOngoingProjects,
   handleGetCompletedProjects,
-  handleGetAcceptedProjects,
+  handleSubmitWork
 } = require("../../controller/projectAssignmentController/projectAssignmentController");
 const { authorizeRoles } = require("../../middleware/roleMiddleware");
 
 const router = express.Router();
 
-// Get all my assignments (with optional filters)
-router.get(
-  "/my-assignments",
-  authorizeRoles(["employee"]),
-  handleGetMyAssignments
-);
 
-// Get only pending assignments (need to accept/reject)
-router.get(
-  "/pending",
-  authorizeRoles(["employee"]),
-  handleGetPendingAssignments
-);
-
-// Get ongoing projects (currently working on)
 router.get(
   "/ongoing",
   authorizeRoles(["employee"]),
@@ -43,12 +25,6 @@ router.get(
   handleGetCompletedProjects
 );
 
-// Get all accepted projects (both ongoing and completed)
-router.get(
-  "/accepted",
-  authorizeRoles(["employee"]),
-  handleGetAcceptedProjects
-);
 
 // Get a specific assignment by ID
 router.get(
@@ -62,20 +38,6 @@ router.get(
   "/project/:projectId/teammates",
   authorizeRoles(["employee"]),
   handleGetProjectTeammates
-);
-
-// Accept assignment
-router.post(
-  "/:id/accept",
-  authorizeRoles(["employee"]),
-  handleAcceptAssignment
-);
-
-// Reject assignment
-router.post(
-  "/:id/reject",
-  authorizeRoles(["employee"]),
-  handleRejectAssignment
 );
 
 // Submit work

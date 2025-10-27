@@ -4,9 +4,6 @@ const {
   handleGetProjectAssignments,
   handleRemoveEmployeeFromProject,
   handleUpdateAssignmentRole,
-  handleVerifyWork,
-  handleRejectWork,
-  handleRequestRevision,
 } = require("../../controller/projectAssignmentController/projectAssignmentController");
 const { authorizeRoles } = require("../../middleware/roleMiddleware");
 
@@ -32,13 +29,6 @@ router.delete(
   "/:assignmentId",
   authorizeRoles(["manager"]),
   handleRemoveEmployeeFromProject
-);
-router.post("/:id/verify-work", authorizeRoles(["manager"]), handleVerifyWork);
-router.post("/:id/reject-work", authorizeRoles(["manager"]), handleRejectWork);
-router.post(
-  "/:id/request-revision",
-  authorizeRoles(["manager"]),
-  handleRequestRevision
 );
 
 module.exports = router;

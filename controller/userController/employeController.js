@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const User  = require("../../model/userModel/user");
 const { createToken } = require("../../services/authServices");
 const { setTokenCookie, clearTokenCookie } = require("../../services/cookieServices");
-const { sendApprovalRequestToManager } = require("../../emailService/approvalEmail");
+const { sendLoginGuideToEmployee } = require("../../emailService/approvalEmail");
 
 
 const handleEmployeeSignUp = async (req, res) => {
@@ -25,11 +25,10 @@ const handleEmployeeSignUp = async (req, res) => {
       email,
       password: hashedPassword,
       role: "employee",
-      isApproved: false,
       employeeId: 'E' + Math.floor(1000 + Math.random() * 9000).toString()
     });
 
-    await sendApprovalRequestToManager(newUser.email, newUser.role);
+    await sendLoginGuideToEmployee(newUser.email, newUser.role);
     
     res.status(201).json({
       success: true,
@@ -81,12 +80,6 @@ const handleEmployeeLogin = async (req, res) => {
       });
     }
 
-    if(!user.isApproved){
-      return res.status(403).json({
-        success: false,
-        message: "Account not approved by manager. Please contact support or wait till approved.",
-      });
-    }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
 

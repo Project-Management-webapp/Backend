@@ -45,34 +45,6 @@ const ProjectAssignment = sequelize.define('ProjectAssignment', {
       key: 'id',
     },
   },
-  
-  // Assignment Acceptance Workflow
-  assignmentStatus: {
-    type: DataTypes.ENUM('pending', 'accepted', 'rejected', 'cancelled'),
-    allowNull: false,
-    defaultValue: 'pending',
-    comment: 'Employee acceptance status for the project assignment'
-  },
-  acceptedAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    comment: 'Timestamp when employee accepted the assignment'
-  },
-  rejectedAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-  },
-  rejectedReason: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: 'Reason provided by employee for rejecting assignment'
-  },
-  responseDeadline: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    comment: 'Deadline for employee to accept/reject assignment'
-  },
-  
   // Payment Allocation from Project Budget
   allocatedAmount: {
     type: DataTypes.DECIMAL(10, 2),
@@ -95,10 +67,10 @@ const ProjectAssignment = sequelize.define('ProjectAssignment', {
     allowNull: true,
     defaultValue: 'project_completion',
   },
-  
+
   // Work Submission and Verification
   workStatus: {
-    type: DataTypes.ENUM('not_started', 'in_progress', 'submitted', 'verified', 'rejected', 'revision_required'),
+    type: DataTypes.ENUM('not_started', 'in_progress', 'submitted'),
     allowNull: false,
     defaultValue: 'not_started',
     comment: 'Status of work completion and verification'
@@ -112,50 +84,6 @@ const ProjectAssignment = sequelize.define('ProjectAssignment', {
     allowNull: true,
     comment: 'When employee marked work as completed'
   },
-  workSubmissionNotes: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: 'Notes provided by employee during work submission'
-  },
-  workVerifiedAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    comment: 'When manager verified the completed work'
-  },
-  workVerifiedBy: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'users',
-      key: 'id',
-    },
-    comment: 'Manager/Admin who verified the work'
-  },
-  verificationNotes: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: 'Feedback from manager during verification'
-  },
-  workRejectedAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-  },
-  rejectionReason: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: 'Reason for work rejection by manager'
-  },
-  revisionDeadline: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    comment: 'Deadline for employee to submit revised work'
-  },
-  
-  performanceFeedback: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-  },
-  
   // Additional Information
   deliverables: {
     type: DataTypes.JSON,

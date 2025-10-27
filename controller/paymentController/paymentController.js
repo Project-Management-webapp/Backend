@@ -229,12 +229,12 @@ const handleRequestPayment = async (req, res) => {
     }
 
     // Check if work status is verified
-    if (assignment.workStatus !== 'verified') {
+    if (assignment.workStatus !== 'submitted') {
       return res.status(400).json({
         success: false,
-        message: `Payment request not allowed. Your work status is '${assignment.workStatus}'. Only verified work can request payment.`,
+        message: `Payment request not allowed. Your work status is '${assignment.workStatus}'. Only submitted work can request payment.`,
         currentStatus: assignment.workStatus,
-        allowedStatus: 'verified'
+        allowedStatus: 'submitted'
       });
     }
 
@@ -299,7 +299,7 @@ const handleRequestPayment = async (req, res) => {
   }
 };
 
-const   handleApprovePaymentRequest = async (req, res) => {
+const handleApprovePaymentRequest = async (req, res) => {
   try {
     const { id } = req.params;
     const { approvalNotes, transactionId, transactionProofLink } = req.body;
@@ -352,11 +352,34 @@ const   handleApprovePaymentRequest = async (req, res) => {
     payment.transactionProofLink = transactionProofLink;
     await payment.save();
 
+    // Update employee's earnings
+    const employee = await User.findByPk(payment.employeeId);
+    if (employee) {
+      // Update total earnings
+      employee.totalEarnings = parseFloat(employee.totalEarnings || 0) + parseFloat(payment.amount);
+      
+      // Update pending earnings (subtract the amount that was pending)
+      employee.pendingEarnings = parseFloat(employee.pendingEarnings || 0) - parseFloat(payment.amount);
+      
+      // Update project earnings array
+      const projectEarnings = employee.projectEarnings || [];
+      projectEarnings.push({
+        projectId: payment.projectId,
+        projectName: payment.project.name,
+        amount: parseFloat(payment.amount),
+        confirmedAt: new Date(),
+        paymentId: payment.id
+      });
+      employee.projectEarnings = projectEarnings;
+      
+      await employee.save();
+    }
+
     // Notify employee
     await Notification.create({
       userId: payment.employeeId,
       title: 'Payment Processed',
-      message: `Your payment of ${payment.amount} ${payment.currency} for project "${payment.project.name}" has been processed. Please confirm receipt.`,
+      message: `Your payment of ${payment.amount} ${payment.currency} for project "${payment.project.name}" has been processed.`,
       type: 'payment',
       relatedId: payment.id,
       relatedType: 'payment',
@@ -365,7 +388,7 @@ const   handleApprovePaymentRequest = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Payment approved and processed successfully with transaction proof. Waiting for employee confirmation.",
+      message: "Payment approved and processed successfully with transaction proof.",
       payment
     });
 
@@ -456,114 +479,6 @@ const handleRejectPaymentRequest = async (req, res) => {
     });
   }
 };
-
-
-
-// Confirm payment received (Employee only)
-const handleConfirmPaymentReceived = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { confirmationNotes } = req.body;
-    const userId = req.user.id;
-
-    const payment = await Payment.findByPk(id, {
-      include: [
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name', 'createdBy']
-        }
-      ]
-    });
-
-    if (!payment) {
-      return res.status(404).json({
-        success: false,
-        message: "Payment not found"
-      });
-    }
-
-    if (payment.employeeId !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied"
-      });
-    }
-
-    if (payment.requestStatus !== 'paid') {
-      return res.status(400).json({
-        success: false,
-        message: "Payment has not been processed yet"
-      });
-    }
-
-    if (payment.employeeConfirmation) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment already confirmed"
-      });
-    }
-
-    // Update payment
-    payment.employeeConfirmation = true;
-    payment.confirmedAt = new Date();
-    payment.confirmationNotes = confirmationNotes;
-    payment.requestStatus = 'confirmed';
-    await payment.save();
-
-    // Update employee earnings
-    const employee = await User.findByPk(userId);
-    employee.totalEarnings = parseFloat(employee.totalEarnings || 0) + parseFloat(payment.amount);
-    employee.pendingEarnings = parseFloat(employee.pendingEarnings || 0) - parseFloat(payment.amount);
-    employee.lastPaymentDate = new Date();
-    employee.lastPaymentAmount = payment.amount;
-
-    // Update projectEarnings array
-    const projectEarnings = employee.projectEarnings || [];
-    projectEarnings.push({
-      projectId: payment.projectId,
-      projectName: payment.project.name,
-      projectCode: payment.project.projectCode,
-      amount: payment.amount,
-      currency: payment.currency,
-      confirmedAt: new Date(),
-      paymentId: payment.id
-    });
-    employee.projectEarnings = projectEarnings;
-    await employee.save();
-
-    // Notify manager
-    await Notification.create({
-      userId: payment.project.createdBy,
-      title: 'Payment Confirmed',
-      message: `Employee confirmed receipt of payment for project: ${payment.project.name}`,
-      type: 'payment',
-      relatedId: payment.id,
-      relatedType: 'payment',
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Payment confirmed successfully. Your earnings have been updated.",
-      payment,
-      earnings: {
-        totalEarnings: employee.totalEarnings,
-        pendingEarnings: employee.pendingEarnings
-      }
-    });
-
-  } catch (error) {
-    console.error("Confirm payment error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};
-
-
-
 module.exports = {
   handleGetAllPayments,
   handleGetPaymentById,
@@ -571,5 +486,4 @@ module.exports = {
   handleRequestPayment,
   handleApprovePaymentRequest,
   handleRejectPaymentRequest,
-  handleConfirmPaymentReceived,
 };

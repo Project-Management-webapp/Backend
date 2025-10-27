@@ -10,7 +10,7 @@ const handleCreateProject = async (req, res) => {
       name,
       description,
       projectType,
-      category,
+      customProjectType,
       
       // Timeline Information
       startDate,
@@ -19,6 +19,8 @@ const handleCreateProject = async (req, res) => {
       actualEndDate,
       estimatedHours,
       actualHours,
+      estimatedConsumables,
+      actualConsumables,
       
       // Status and Progress
       status,
@@ -32,35 +34,12 @@ const handleCreateProject = async (req, res) => {
       billingType,
       
       // Client Information
-      clientName,
-      clientEmail,
-      clientPhone,
-      clientCompany,
-      stakeholders,
-      
-      // Technical Specifications
-      technologies,
-      frameworks,
-      programmingLanguages,
-      database,
-      cloudProvider,
-      architecture,
-      
-      // Repository and Version Control
-      repositoryUrl,
-      repositoryType,
+      companyName,
+      companyEmail,
+      companyPhone,
       
       // Reference Links
-      productionUrl,
-      stagingUrl,
-      developmentUrl,
-      documentationUrl,
-      apiDocumentationUrl,
-      figmaUrl,
-      jiraUrl,
-      slackChannel,
       referenceLinks,
-      
       
       // Project Management
       milestones,
@@ -71,15 +50,6 @@ const handleCreateProject = async (req, res) => {
       
       // Quality Assurance
       testingStatus,
-      testCoverage,
-      qaApprovalStatus,
-      
-      // Deployment Information
-      deploymentStatus,
-      lastDeploymentDate,
-      deploymentFrequency,
-      cicdPipeline,
-      
       
       // Additional Information
       notes,
@@ -95,13 +65,20 @@ const handleCreateProject = async (req, res) => {
 
     const createdBy = req.user.id;
 
+    // Validation: if projectType is 'other', customProjectType is required
+    if (projectType === 'other' && !customProjectType) {
+      return res.status(400).json({
+        success: false,
+        message: "customProjectType is required when projectType is 'other'"
+      });
+    }
 
     const newProject = await Project.create({
       // Basic Information
       name,
       description: description || null,
-      projectType: projectType || 'web_development',
-      category: category || null,
+      projectType: projectType || 'other',
+      customProjectType: projectType === 'other' ? customProjectType : null,
       
       // Timeline Information
       startDate,
@@ -110,6 +87,8 @@ const handleCreateProject = async (req, res) => {
       actualEndDate: actualEndDate || null,
       estimatedHours: estimatedHours || 0,
       actualHours: actualHours || 0,
+      estimatedConsumables: estimatedConsumables || [],
+      actualConsumables: actualConsumables || [],
       
       // Status and Progress
       status: status || 'pending',
@@ -122,39 +101,15 @@ const handleCreateProject = async (req, res) => {
       currency: currency || 'USD',
       billingType: billingType || 'fixed_price',
       
-      // Client/Stakeholder Information
-      clientName: clientName || null,
-      clientEmail: clientEmail || null,
-      clientPhone: clientPhone || null,
-      clientCompany: clientCompany || null,
-      stakeholders: stakeholders || null,
-      
-      // Technical Specifications
-      technologies: technologies || null,
-      frameworks: frameworks || null,
-      programmingLanguages: programmingLanguages || null,
-      database: database || null,
-      cloudProvider: cloudProvider || null,
-      architecture: architecture || null,
-      
-      // Repository and Version Control
-      repositoryUrl: repositoryUrl || null,
-      repositoryType: repositoryType || null,
+      // Client Information
+      companyName: companyName || null,
+      companyEmail: companyEmail || null,
+      companyPhone: companyPhone || null,
       
       // Reference Links
-      productionUrl: productionUrl || null,
-      stagingUrl: stagingUrl || null,
-      developmentUrl: developmentUrl || null,
-      documentationUrl: documentationUrl || null,
-      apiDocumentationUrl: apiDocumentationUrl || null,
-      figmaUrl: figmaUrl || null,
-      jiraUrl: jiraUrl || null,
-      slackChannel: slackChannel || null,
       referenceLinks: referenceLinks || null,
       
-
-      
-      // Project Managemen
+      // Project Management
       milestones: milestones || null,
       
       // Risks and Issues
@@ -163,20 +118,9 @@ const handleCreateProject = async (req, res) => {
       
       // Quality Assurance
       testingStatus: testingStatus || null,
-      testCoverage: testCoverage || null,
-      qaApprovalStatus: qaApprovalStatus || 'pending',
       
-      // Deployment Information
-      deploymentStatus: deploymentStatus || null,
-      lastDeploymentDate: lastDeploymentDate || null,
-      deploymentFrequency: deploymentFrequency || null,
-      cicdPipeline: cicdPipeline || null,
-      
-  
-    
       // Additional Information
       notes: notes || null,
-  
       
       // Team Information
       teamSize: teamSize || null,
@@ -347,7 +291,7 @@ const handleUpdateProject = async (req, res) => {
       name,
       description,
       projectType,
-      category,
+      customProjectType,
       
       // Timeline Information
       startDate,
@@ -356,6 +300,8 @@ const handleUpdateProject = async (req, res) => {
       actualEndDate,
       estimatedHours,
       actualHours,
+      estimatedConsumables,
+      actualConsumables,
       
       // Status and Progress
       status,
@@ -369,36 +315,12 @@ const handleUpdateProject = async (req, res) => {
       billingType,
       
       // Client Information
-      clientName,
-      clientEmail,
-      clientPhone,
-      clientCompany,
-      stakeholders,
-      
-      // Technical Specifications
-      technologies,
-      frameworks,
-      programmingLanguages,
-      database,
-      cloudProvider,
-      architecture,
-      
-      // Repository and Version Control
-      repositoryUrl,
-      repositoryType,
+      companyName,
+      companyEmail,
+      companyPhone,
       
       // Reference Links
-      productionUrl,
-      stagingUrl,
-      developmentUrl,
-      documentationUrl,
-      apiDocumentationUrl,
-      figmaUrl,
-      jiraUrl,
-      slackChannel,
       referenceLinks,
-      
-    
       
       // Project Management
       milestones,
@@ -409,14 +331,6 @@ const handleUpdateProject = async (req, res) => {
       
       // Quality Assurance
       testingStatus,
-      testCoverage,
-      qaApprovalStatus,
-      
-      // Deployment Information
-      deploymentStatus,
-      lastDeploymentDate,
-      deploymentFrequency,
-      cicdPipeline,
     
       // Additional Information
       notes,
@@ -439,13 +353,29 @@ const handleUpdateProject = async (req, res) => {
       });
     }
 
+    // Validation: if projectType is 'other', customProjectType is required
+    if (projectType === 'other' && !customProjectType) {
+      return res.status(400).json({
+        success: false,
+        message: "customProjectType is required when projectType is 'other'"
+      });
+    }
+
     const updateData = {};
     
     // Basic Information
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
-    if (projectType !== undefined) updateData.projectType = projectType;
-    if (category !== undefined) updateData.category = category;
+    if (projectType !== undefined) {
+      updateData.projectType = projectType;
+      // Clear customProjectType if projectType is not 'other'
+      if (projectType !== 'other') {
+        updateData.customProjectType = null;
+      }
+    }
+    if (customProjectType !== undefined && projectType === 'other') {
+      updateData.customProjectType = customProjectType;
+    }
     
     // Timeline Information
     if (startDate !== undefined) updateData.startDate = startDate;
@@ -454,6 +384,8 @@ const handleUpdateProject = async (req, res) => {
     if (actualEndDate !== undefined) updateData.actualEndDate = actualEndDate;
     if (estimatedHours !== undefined) updateData.estimatedHours = estimatedHours;
     if (actualHours !== undefined) updateData.actualHours = actualHours;
+    if (estimatedConsumables !== undefined) updateData.estimatedConsumables = estimatedConsumables;
+    if (actualConsumables !== undefined) updateData.actualConsumables = actualConsumables;
     
     // Status and Progress
     if (status !== undefined) updateData.status = status;
@@ -466,39 +398,15 @@ const handleUpdateProject = async (req, res) => {
     if (currency !== undefined) updateData.currency = currency;
     if (billingType !== undefined) updateData.billingType = billingType;
     
-    // Client/Stakeholder Information
-    if (clientName !== undefined) updateData.clientName = clientName;
-    if (clientEmail !== undefined) updateData.clientEmail = clientEmail;
-    if (clientPhone !== undefined) updateData.clientPhone = clientPhone;
-    if (clientCompany !== undefined) updateData.clientCompany = clientCompany;
-    if (stakeholders !== undefined) updateData.stakeholders = stakeholders;
-    
-    // Technical Specifications
-    if (technologies !== undefined) updateData.technologies = technologies;
-    if (frameworks !== undefined) updateData.frameworks = frameworks;
-    if (programmingLanguages !== undefined) updateData.programmingLanguages = programmingLanguages;
-    if (database !== undefined) updateData.database = database;
-    if (cloudProvider !== undefined) updateData.cloudProvider = cloudProvider;
-    if (architecture !== undefined) updateData.architecture = architecture;
-    
-    // Repository and Version Control
-    if (repositoryUrl !== undefined) updateData.repositoryUrl = repositoryUrl;
-    if (repositoryType !== undefined) updateData.repositoryType = repositoryType;
+    // Client Information
+    if (companyName !== undefined) updateData.companyName = companyName;
+    if (companyEmail !== undefined) updateData.companyEmail = companyEmail;
+    if (companyPhone !== undefined) updateData.companyPhone = companyPhone;
     
     // Reference Links
-    if (productionUrl !== undefined) updateData.productionUrl = productionUrl;
-    if (stagingUrl !== undefined) updateData.stagingUrl = stagingUrl;
-    if (developmentUrl !== undefined) updateData.developmentUrl = developmentUrl;
-    if (documentationUrl !== undefined) updateData.documentationUrl = documentationUrl;
-    if (apiDocumentationUrl !== undefined) updateData.apiDocumentationUrl = apiDocumentationUrl;
-    if (figmaUrl !== undefined) updateData.figmaUrl = figmaUrl;
-    if (jiraUrl !== undefined) updateData.jiraUrl = jiraUrl;
-    if (slackChannel !== undefined) updateData.slackChannel = slackChannel;
     if (referenceLinks !== undefined) updateData.referenceLinks = referenceLinks;
     
-
-    
-    
+    // Project Management
     if (milestones !== undefined) updateData.milestones = milestones;
     
     // Risks and Issues
@@ -507,17 +415,7 @@ const handleUpdateProject = async (req, res) => {
     
     // Quality Assurance
     if (testingStatus !== undefined) updateData.testingStatus = testingStatus;
-    if (testCoverage !== undefined) updateData.testCoverage = testCoverage;
-    if (qaApprovalStatus !== undefined) updateData.qaApprovalStatus = qaApprovalStatus;
     
-    // Deployment Information
-    if (deploymentStatus !== undefined) updateData.deploymentStatus = deploymentStatus;
-    if (lastDeploymentDate !== undefined) updateData.lastDeploymentDate = lastDeploymentDate;
-    if (deploymentFrequency !== undefined) updateData.deploymentFrequency = deploymentFrequency;
-    if (cicdPipeline !== undefined) updateData.cicdPipeline = cicdPipeline;
-    
- 
-  
     // Additional Information
     if (notes !== undefined) updateData.notes = notes;
     

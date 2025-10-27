@@ -79,10 +79,7 @@ const handleAssignEmployeeToProject = async (req, res) => {
       });
     }
 
-    // Calculate response deadline (default 48 hours)
-    const deadline = responseDeadline || new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-    // Create assignment with pending status
     const assignment = await ProjectAssignment.create({
       projectId,
       employeeId,
@@ -96,8 +93,7 @@ const handleAssignEmployeeToProject = async (req, res) => {
       responsibilities,
       deliverables,
       assignmentStatus: 'pending',
-      responseDeadline: deadline,
-      workStatus: 'not_started',
+      workStatus: 'in_progress',
     });
 
     // Update project allocated amount
@@ -108,7 +104,7 @@ const handleAssignEmployeeToProject = async (req, res) => {
     await Notification.create({
       userId: employeeId,
       title: 'New Project Assignment',
-      message: `You have been assigned to project: ${project.name}. Allocated Amount: ${allocatedAmount} ${project.currency}. Please accept or reject within 48 hours.`,
+      message: `You have been assigned to project: ${project.name}. Allocated Amount: ${allocatedAmount} ${project.currency}. Please start working on it.`,
       type: 'project_assignment',
       relatedId: projectId,
       relatedType: 'project',
@@ -361,193 +357,13 @@ const handleGetProjectTeammates = async (req, res) => {
   }
 };
 
-// Accept project assignment (Employee only)
-const handleAcceptAssignment = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id;
 
-    const assignment = await ProjectAssignment.findByPk(id, {
-      include: [
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name', 'budget', 'createdBy']
-        }
-      ]
-    });
 
-    if (!assignment) {
-      return res.status(404).json({
-        success: false,
-        message: "Assignment not found"
-      });
-    }
-
-    // Check if user is the assigned employee
-    if (assignment.employeeId !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied"
-      });
-    }
-
-    // Check if assignment is still pending
-    if (assignment.assignmentStatus !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: `Assignment already ${assignment.assignmentStatus}`
-      });
-    }
-
-    // Update assignment status
-    assignment.assignmentStatus = 'accepted';
-    assignment.acceptedAt = new Date();
-    assignment.workStatus = 'in_progress';
-    assignment.workStartedAt = new Date();
-    await assignment.save();
-
-    // Notify manager/creator
-    await Notification.create({
-      userId: assignment.project.createdBy,
-      title: 'Assignment Accepted',
-      message: `Employee has accepted the assignment for project: ${assignment.project.name}`,
-      type: 'project_assignment',
-      relatedId: assignment.projectId,
-      relatedType: 'project',
-    });
-
-    // Notify assignedBy user
-    if (assignment.assignedBy !== assignment.project.createdBy) {
-      await Notification.create({
-        userId: assignment.assignedBy,
-        title: 'Assignment Accepted',
-        message: `Employee has accepted the assignment for project: ${assignment.project.name}`,
-        type: 'project_assignment',
-        relatedId: assignment.projectId,
-        relatedType: 'project',
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Assignment accepted successfully. You can now start working on the project.",
-      assignment
-    });
-
-  } catch (error) {
-    console.error("Accept assignment error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};
-
-// Reject project assignment (Employee only)
-const handleRejectAssignment = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { rejectedReason } = req.body;
-    const userId = req.user.id;
-
-    if (!rejectedReason) {
-      return res.status(400).json({
-        success: false,
-        message: "Rejection reason is required"
-      });
-    }
-
-    const assignment = await ProjectAssignment.findByPk(id, {
-      include: [
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name',  'budget', 'allocatedAmount', 'createdBy']
-        }
-      ]
-    });
-
-    if (!assignment) {
-      return res.status(404).json({
-        success: false,
-        message: "Assignment not found"
-      });
-    }
-
-    // Check if user is the assigned employee
-    if (assignment.employeeId !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied"
-      });
-    }
-
-    // Check if assignment is still pending
-    if (assignment.assignmentStatus !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: `Assignment already ${assignment.assignmentStatus}`
-      });
-    }
-
-    // Update assignment status
-    assignment.assignmentStatus = 'rejected';
-    assignment.rejectedAt = new Date();
-    assignment.rejectedReason = rejectedReason;
-    assignment.isActive = false;
-    await assignment.save();
-
-    // Return allocated amount to project budget
-    const project = assignment.project;
-    project.allocatedAmount = parseFloat(project.allocatedAmount || 0) - parseFloat(assignment.allocatedAmount);
-    await project.save();
-
-    // Notify manager/creator
-    await Notification.create({
-      userId: project.createdBy,
-      title: 'Assignment Rejected',
-      message: `Employee rejected the assignment for project: ${project.name}. Reason: ${rejectedReason}`,
-      type: 'project_assignment',
-      relatedId: assignment.projectId,
-      relatedType: 'project',
-      priority: 'high'
-    });
-
-    // Notify assignedBy user
-    if (assignment.assignedBy !== project.createdBy) {
-      await Notification.create({
-        userId: assignment.assignedBy,
-        title: 'Assignment Rejected',
-        message: `Employee rejected the assignment for project: ${project.name}. Reason: ${rejectedReason}`,
-        type: 'project_assignment',
-        relatedId: assignment.projectId,
-        relatedType: 'project',
-        priority: 'high'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Assignment rejected successfully",
-      assignment
-    });
-
-  } catch (error) {
-    console.error("Reject assignment error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};
 
 const handleSubmitWork = async (req, res) => {
   try {
     const { id } = req.params;
-    const { workSubmissionNotes, actualDeliverables } = req.body;
+    const { actualDeliverables } = req.body;
     const userId = req.user.id;
 
     const assignment = await ProjectAssignment.findByPk(id, {
@@ -575,18 +391,10 @@ const handleSubmitWork = async (req, res) => {
       });
     }
 
-    // Check if assignment is accepted
-    if (assignment.assignmentStatus !== 'accepted') {
-      return res.status(400).json({
-        success: false,
-        message: "You must accept the assignment before submitting work"
-      });
-    }
 
     // Update assignment
     assignment.workStatus = 'submitted';
     assignment.workSubmittedAt = new Date();
-    assignment.workSubmissionNotes = workSubmissionNotes;
     assignment.actualDeliverables = actualDeliverables;
     await assignment.save();
 
@@ -594,7 +402,7 @@ const handleSubmitWork = async (req, res) => {
     await Notification.create({
       userId: assignment.project.createdBy,
       title: 'Work Submitted',
-      message: `Employee has submitted completed work for project: ${assignment.project.name}. Please verify.`,
+      message: `Employee has submitted completed work for project: ${assignment.project.name}.`,
       type: 'project_assignment',
       relatedId: assignment.projectId,
       relatedType: 'project',
@@ -603,7 +411,7 @@ const handleSubmitWork = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Work submitted successfully. Waiting for manager verification.",
+      message: "Work submitted successfully",
       assignment
     });
 
@@ -617,289 +425,7 @@ const handleSubmitWork = async (req, res) => {
   }
 };
 
-// Verify employee's work (Manager/Admin only)
-const handleVerifyWork = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { verificationNotes,  performanceFeedback } = req.body;
-    const userId = req.user.id;
 
-    const assignment = await ProjectAssignment.findByPk(id, {
-      include: [
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name',]
-        },
-        {
-          model: User,
-          as: 'employee',
-          attributes: ['id', 'fullName', 'email', 'completedProjectsCount']
-        }
-      ]
-    });
-
-    if (!assignment) {
-      return res.status(404).json({
-        success: false,
-        message: "Assignment not found"
-      });
-    }
-
-    // Check if work is submitted
-    if (assignment.workStatus !== 'submitted') {
-      return res.status(400).json({
-        success: false,
-        message: "Work has not been submitted yet"
-      });
-    }
-
-    // Update assignment
-    assignment.workStatus = 'verified';
-    assignment.workVerifiedAt = new Date();
-    assignment.workVerifiedBy = userId;
-    assignment.verificationNotes = verificationNotes;
-    assignment.performanceFeedback = performanceFeedback;
-    await assignment.save();
-
-    // Update employee's completed projects count
-    const employee = assignment.employee;
-    employee.completedProjectsCount = (employee.completedProjectsCount || 0) + 1;
-    await employee.save();
-
-    // Notify employee
-    await Notification.create({
-      userId: assignment.employeeId,
-      title: 'Work Verified',
-      message: `Your work for project: ${assignment.project.name} has been verified. You can now request payment.`,
-      type: 'project_assignment',
-      relatedId: assignment.projectId,
-      relatedType: 'project',
-      priority: 'high'
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Work verified successfully",
-      assignment
-    });
-
-  } catch (error) {
-    console.error("Verify work error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};
-
-// Reject employee's work (Manager/Admin only)
-const handleRejectWork = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { rejectionReason, revisionDeadline } = req.body;
-    const userId = req.user.id;
-
-    if (!rejectionReason) {
-      return res.status(400).json({
-        success: false,
-        message: "Rejection reason is required"
-      });
-    }
-
-    const assignment = await ProjectAssignment.findByPk(id, {
-      include: [
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name']
-        }
-      ]
-    });
-
-    if (!assignment) {
-      return res.status(404).json({
-        success: false,
-        message: "Assignment not found"
-      });
-    }
-
-    // Check if work is submitted
-    if (assignment.workStatus !== 'submitted') {
-      return res.status(400).json({
-        success: false,
-        message: "Work has not been submitted yet"
-      });
-    }
-
-    // Update assignment
-    assignment.workStatus = 'rejected';
-    assignment.workRejectedAt = new Date();
-    assignment.rejectionReason = rejectionReason;
-    assignment.revisionDeadline = revisionDeadline;
-    await assignment.save();
-
-    // Notify employee
-    await Notification.create({
-      userId: assignment.employeeId,
-      title: 'Work Rejected',
-      message: `Your work for project: ${assignment.project.name} needs revision. Reason: ${rejectionReason}`,
-      type: 'project_assignment',
-      relatedId: assignment.projectId,
-      relatedType: 'project',
-      priority: 'high'
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Work rejected. Employee has been notified for revision.",
-      assignment
-    });
-
-  } catch (error) {
-    console.error("Reject work error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};
-
-const handleRequestRevision = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { revisionNotes, revisionDeadline } = req.body;
-    const userId = req.user.id;
-
-    if (!revisionNotes) {
-      return res.status(400).json({
-        success: false,
-        message: "Revision notes are required"
-      });
-    }
-
-    const assignment = await ProjectAssignment.findByPk(id, {
-      include: [
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name',]
-        }
-      ]
-    });
-
-    if (!assignment) {
-      return res.status(404).json({
-        success: false,
-        message: "Assignment not found"
-      });
-    }
-
-    // Update assignment
-    assignment.workStatus = 'revision_required';
-    assignment.verificationNotes = revisionNotes;
-    assignment.revisionDeadline = revisionDeadline;
-    await assignment.save();
-
-    // Notify employee
-    await Notification.create({
-      userId: assignment.employeeId,
-      title: 'Revision Required',
-      message: `Revision required for project: ${assignment.project.name}. ${revisionNotes}`,
-      type: 'project_assignment',
-      relatedId: assignment.projectId,
-      relatedType: 'project',
-      priority: 'high'
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Revision requested successfully",
-      assignment
-    });
-
-  } catch (error) {
-    console.error("Request revision error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};
-
-// Get all assignments for the logged-in employee
-const handleGetMyAssignments = async (req, res) => {
-  try {
-    const employeeId = req.user.id;
-    const { status, workStatus } = req.query;
-
-    // Build query conditions
-    const whereConditions = {
-      employeeId,
-      isActive: true
-    };
-
-    if (status) {
-      whereConditions.assignmentStatus = status;
-    }
-
-    if (workStatus) {
-      whereConditions.workStatus = workStatus;
-    }
-
-    const assignments = await ProjectAssignment.findAll({
-      where: whereConditions,
-      include: [
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name', 'description', 'status', 'priority', 'deadline', 'budget', 'category']
-        },
-        {
-          model: User,
-          as: 'assigner',
-          attributes: ['id', 'fullName', 'email', 'profileImage']
-        }
-      ],
-      order: [['createdAt', 'DESC']]
-    });
-
-    // Separate assignments by status
-    const pending = assignments.filter(a => a.assignmentStatus === 'pending');
-    const accepted = assignments.filter(a => a.assignmentStatus === 'accepted');
-    const rejected = assignments.filter(a => a.assignmentStatus === 'rejected');
-
-    res.json({
-      success: true,
-      message: "Assignments retrieved successfully",
-      summary: {
-        total: assignments.length,
-        pending: pending.length,
-        accepted: accepted.length,
-        rejected: rejected.length
-      },
-      assignments: {
-        all: assignments,
-        pending,
-        accepted,
-        rejected
-      }
-    });
-
-  } catch (error) {
-    console.error("Get my assignments error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};
-
-// Get a specific assignment by ID for the logged-in employee
 const handleGetMyAssignmentById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -915,7 +441,7 @@ const handleGetMyAssignmentById = async (req, res) => {
         {
           model: Project,
           as: 'project',
-          attributes: ['id', 'name', 'description', 'status', 'priority', 'startDate', 'deadline', 'budget', 'category', 'projectType', 'technologies', 'frameworks']
+          attributes: ['id', 'name', 'description', 'status', 'priority', 'startDate', 'deadline', 'budget', 'projectType', ]
         },
         {
           model: User,
@@ -948,60 +474,7 @@ const handleGetMyAssignmentById = async (req, res) => {
   }
 };
 
-// Get only pending assignments for the logged-in employee
-const handleGetPendingAssignments = async (req, res) => {
-  try {
-    const employeeId = req.user.id;
 
-    const pendingAssignments = await ProjectAssignment.findAll({
-      where: {
-        employeeId,
-        assignmentStatus: 'pending',
-        isActive: true
-      },
-      include: [
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name', 'description', 'status', 'priority', 'deadline', 'budget', 'category', 'projectType']
-        },
-        {
-          model: User,
-          as: 'assigner',
-          attributes: ['id', 'fullName', 'email', 'profileImage']
-        }
-      ],
-      order: [['createdAt', 'DESC']]
-    });
-
-    // Check for expired response deadlines
-    const now = new Date();
-    const expiredAssignments = pendingAssignments.filter(a => 
-      a.responseDeadline && new Date(a.responseDeadline) < now
-    );
-
-    res.json({
-      success: true,
-      message: "Pending assignments retrieved successfully",
-      count: pendingAssignments.length,
-      expiredCount: expiredAssignments.length,
-      assignments: pendingAssignments,
-      expiredAssignments: expiredAssignments.map(a => ({
-        id: a.id,
-        projectName: a.project?.name,
-        responseDeadline: a.responseDeadline
-      }))
-    });
-
-  } catch (error) {
-    console.error("Get pending assignments error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};
 
 // Admin: Toggle assignment active status (disable/enable)
 const handleToggleAssignmentStatus = async (req, res) => {
@@ -1083,15 +556,14 @@ const handleGetOngoingProjects = async (req, res) => {
     const ongoingAssignments = await ProjectAssignment.findAll({
       where: {
         employeeId,
-        assignmentStatus: 'accepted',
-        workStatus: ['in_progress', 'submitted', 'revision_required'],
+        workStatus: ['in_progress'],
         isActive: true
       },
       include: [
         {
           model: Project,
           as: 'project',
-          attributes: ['id', 'name', 'description', 'status', 'priority', 'deadline', 'budget', 'category']
+          attributes: ['id', 'name', 'description', 'status', 'priority', 'deadline', 'budget']
         },
         {
           model: User,
@@ -1105,8 +577,6 @@ const handleGetOngoingProjects = async (req, res) => {
     // Calculate progress statistics
     const totalAssignments = ongoingAssignments.length;
     const inProgress = ongoingAssignments.filter(a => a.workStatus === 'in_progress').length;
-    const submitted = ongoingAssignments.filter(a => a.workStatus === 'submitted').length;
-    const needingRevision = ongoingAssignments.filter(a => a.workStatus === 'revision_required').length;
     
     // Calculate total allocated amount
     const totalAllocated = ongoingAssignments.reduce((sum, a) => sum + (parseFloat(a.allocatedAmount) || 0), 0);
@@ -1117,8 +587,6 @@ const handleGetOngoingProjects = async (req, res) => {
       summary: {
         totalOngoing: totalAssignments,
         inProgress,
-        submitted,
-        needingRevision,
         totalAllocatedAmount: totalAllocated
       },
       projects: ongoingAssignments
@@ -1135,22 +603,21 @@ const handleGetOngoingProjects = async (req, res) => {
 };
 
 // Get completed/verified projects for the logged-in employee
-const   handleGetCompletedProjects = async (req, res) => {
+const handleGetCompletedProjects = async (req, res) => {
   try {
     const employeeId = req.user.id;
 
     const completedAssignments = await ProjectAssignment.findAll({
       where: {
         employeeId,
-        assignmentStatus: 'accepted',
-        workStatus: 'verified',
+        workStatus: 'submitted',
         isActive: true
       },
       include: [
         {
           model: Project,
           as: 'project',
-          attributes: ['id', 'name', 'description', 'status', 'priority', 'deadline', 'budget', 'category']
+          attributes: ['id', 'name', 'description', 'status', 'priority', 'deadline', 'budget']
         },
         {
           model: User,
@@ -1212,66 +679,7 @@ const   handleGetCompletedProjects = async (req, res) => {
   }
 };
 
-// Get all accepted projects (both ongoing and completed)
-const handleGetAcceptedProjects = async (req, res) => {
-  try {
-    const employeeId = req.user.id;
 
-    const acceptedAssignments = await ProjectAssignment.findAll({
-      where: {
-        employeeId,
-        assignmentStatus: 'accepted',
-        isActive: true
-      },
-      include: [
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name', 'description', 'status', 'priority', 'deadline', 'budget', 'category']
-        },
-        {
-          model: User,
-          as: 'assigner',
-          attributes: ['id', 'fullName', 'email', 'profileImage']
-        }
-      ],
-      order: [['acceptedAt', 'DESC']]
-    });
-
-    // Categorize by work status
-    const notStarted = acceptedAssignments.filter(a => a.workStatus === 'not_started');
-    const ongoing = acceptedAssignments.filter(a => ['in_progress', 'submitted', 'revision_required'].includes(a.workStatus));
-    const completed = acceptedAssignments.filter(a => a.workStatus === 'verified');
-    const rejected = acceptedAssignments.filter(a => a.workStatus === 'rejected');
-
-    res.json({
-      success: true,
-      message: "Accepted projects retrieved successfully",
-      summary: {
-        total: acceptedAssignments.length,
-        notStarted: notStarted.length,
-        ongoing: ongoing.length,
-        completed: completed.length,
-        rejected: rejected.length
-      },
-      projects: {
-        all: acceptedAssignments,
-        notStarted,
-        ongoing,
-        completed,
-        rejected
-      }
-    });
-
-  } catch (error) {
-    console.error("Get accepted projects error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message
-    });
-  }
-};
 
 module.exports = {
   handleAssignEmployeeToProject,
@@ -1279,17 +687,9 @@ module.exports = {
   handleRemoveEmployeeFromProject,
   handleUpdateAssignmentRole,
   handleGetProjectTeammates,
-  handleAcceptAssignment,
-  handleRejectAssignment,
   handleSubmitWork,
-  handleVerifyWork,
-  handleRejectWork,
-  handleRequestRevision,
-  handleGetMyAssignments,
   handleGetMyAssignmentById,
-  handleGetPendingAssignments,
   handleGetOngoingProjects,
   handleGetCompletedProjects,
-  handleGetAcceptedProjects,
   handleToggleAssignmentStatus,
 };

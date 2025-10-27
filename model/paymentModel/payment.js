@@ -52,15 +52,15 @@ const Payment = sequelize.define('Payment', {
     defaultValue: 'bank_transfer',
   },
   status: {
-    type: DataTypes.ENUM('pending', 'processing', 'completed', 'failed', 'cancelled', 'on_hold'),
+    type: DataTypes.ENUM('pending', 'completed', 'cancelled', 'on_hold'),
     allowNull: false,
     defaultValue: 'pending',
   },
   // Payment Request Workflow
   requestStatus: {
-    type: DataTypes.ENUM('not_requested', 'requested', 'approved', 'rejected', 'paid', 'confirmed'),
+    type: DataTypes.ENUM( 'requested', 'rejected', 'paid'),
     allowNull: false,
-    defaultValue: 'not_requested',
+    defaultValue: 'requested',
     comment: 'Status of payment request workflow'
   },
   requestedAt: {
@@ -110,24 +110,6 @@ const Payment = sequelize.define('Payment', {
     allowNull: true,
     comment: 'URL of transaction Link'
   },
-
-  // Employee Confirmation
-  employeeConfirmation: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
-    comment: 'Whether employee confirmed receiving payment'
-  },
-  confirmedAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    comment: 'When employee confirmed payment receipt'
-  },
-  confirmationNotes: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: 'Notes provided by employee during confirmation'
-  },
-
 
 }, {
   tableName: 'payments',

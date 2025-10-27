@@ -123,15 +123,7 @@ const User = sequelize.define('User', {
     type: DataTypes.ENUM('single', 'married', 'divorced', 'widowed'),
     allowNull: true,
   },
-  nationality: {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-  },
-  bloodGroup: {
-    type: DataTypes.STRING(5),
-    allowNull: true,
-  },
-  
+
   // Professional Information
   joiningDate: {
     type: DataTypes.DATEONLY,
@@ -151,20 +143,8 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING(100),
     allowNull: true,
   },
-  probationEndDate: {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-  },
-  confirmationDate: {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-  },
+
   
-  // Financial Information
-  baseSalary: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-  },
   currency: {
     type: DataTypes.STRING(3),
     allowNull: true,
@@ -205,31 +185,6 @@ const User = sequelize.define('User', {
     allowNull: true,
   },
   
-  payrollId: {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-  },
-  bankAccountNumber: {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-  },
-  bankName: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-  },
-  bankRoutingNumber: {
-    type: DataTypes.STRING(20),
-    allowNull: true,
-  },
-  taxId: {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-  },
-  socialSecurityNumber: {
-    type: DataTypes.STRING(20),
-    allowNull: true,
-  },
-  
   // Skills and Education
   skills: {
     type: DataTypes.JSON,
@@ -261,10 +216,7 @@ const User = sequelize.define('User', {
     type: DataTypes.DATEONLY,
     allowNull: true,
   },
-  nextReviewDate: {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-  },
+
   
   // System and Status Information
   profileImage: {
@@ -329,28 +281,11 @@ const User = sequelize.define('User', {
     allowNull: true,
     defaultValue: 'UTC',
   },
-  
-  // Termination Information
-  terminationDate: {
-    type: DataTypes.DATEONLY,
+    rate: {
+    type: DataTypes.STRING(50),
     allowNull: true,
   },
-  terminationReason: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-  },
-  
 
-  
-  // Verification Status
-  emailVerified: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
- },
-   isApproved: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
- },
 
 }, {
   tableName: 'users',

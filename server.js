@@ -33,7 +33,6 @@ const managerAuthRoutes = require("./routes/userRoute/managerRoute");
 const commonAuthRoutes = require("./routes/userRoute/commonManaEmpRoute");
 const managerProfileRoutes = require("./routes/profileRoute/managerProfile");
 const employeeProfileRoutes = require("./routes/profileRoute/employeeProfile");
-const approvalRoutes = require("./routes/approvalRoute/approvalRoute");
 const employeeDetailRoutes = require("./routes/userRoute/employeeDetail");
 const managerProjectRoutes = require("./routes/projectRoute/managerProjectRoute");
 const employeeProjectRoutes = require("./routes/projectRoute/employeeProjectRoute");
@@ -56,7 +55,6 @@ app.use(
   "/api/user/manager",
   checkForAuthenticationCookie("token"),
   managerProfileRoutes,
-  approvalRoutes,
   employeeDetailRoutes
 );
 
