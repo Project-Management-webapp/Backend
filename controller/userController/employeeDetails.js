@@ -7,7 +7,6 @@ const handleGetAllEmployees = async (req, res) => {
     const employees  = await User.findAndCountAll({
       where: {
       role: ['employee'],
-      isApproved: true
       },
       order: [['createdAt', 'DESC']]
     });
