@@ -3,6 +3,7 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const initDB = require("./mysqlConnection/dbinit");
+const milestoneReminderJob = require("./jobs/milestoneReminderJob");
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -47,6 +48,7 @@ const managerSupportTicketRoutes = require("./routes/supportTicketRoute/managerS
 const employeeSupportTicketRoutes = require("./routes/supportTicketRoute/employeeSupportTicketRoute");
 const employeeStatsRoutes = require("./routes/statsRoute/employeeStatsRoute");
 const managerStatsRoutes = require("./routes/statsRoute/managerStatsRoute");
+const managerFinanceRoutes = require("./routes/financeRoute/managerFinanceRoute");
 const { checkForAuthenticationCookie } = require("./middleware/authMiddleware");
 
 app.use("/api/auth", employeeAuthRoutes, managerAuthRoutes, commonAuthRoutes);
@@ -144,6 +146,13 @@ app.use(
   managerStatsRoutes
 );
 
+// Manager Finance Routes
+app.use(
+  "/api/manager/finance",
+  checkForAuthenticationCookie("token"),
+  managerFinanceRoutes
+);
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
@@ -151,6 +160,8 @@ app.get("/api/health", (req, res) => {
 initDB(() => {
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    milestoneReminderJob.start();
+    console.log(' Milestone reminder cron job started (runs daily at 9:00 AM)');
   });
 });
  
