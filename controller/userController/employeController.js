@@ -233,6 +233,7 @@ const handleEmployeeUpdateProfile = async (req, res) => {
       notes,
       preferences,
       timezone,
+      rate
     } = req.body;
     const profileImage = req.file ? req.file.path : undefined;
 
@@ -303,6 +304,7 @@ const handleEmployeeUpdateProfile = async (req, res) => {
     if (notes !== undefined) updateData.notes = notes;
     if (preferences !== undefined) updateData.preferences = preferences;
     if (timezone !== undefined) updateData.timezone = timezone;
+    if (rate !== undefined) updateData.rate = rate;
 
     // Update user with only the provided fields
     await user.update(updateData);

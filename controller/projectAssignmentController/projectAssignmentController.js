@@ -624,13 +624,8 @@ const handleGetCompletedProjects = async (req, res) => {
           as: 'assigner',
           attributes: ['id', 'fullName', 'email', 'profileImage']
         },
-        {
-          model: User,
-          as: 'verifier',
-          attributes: ['id', 'fullName', 'email', 'profileImage']
-        }
+
       ],
-      order: [['workVerifiedAt', 'DESC']]
     });
 
     // Calculate statistics
