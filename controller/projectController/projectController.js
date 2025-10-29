@@ -226,7 +226,7 @@ const  handleGetProjectById = async (req, res) => {
         {
           model: User,
           as: 'creator',
-          attributes: ['id', 'fullName', 'email', 'role']
+          attributes: ['id', 'fullName', 'email', 'role', 'profileImage']
         },
         {
           model: ProjectAssignment,
@@ -236,7 +236,7 @@ const  handleGetProjectById = async (req, res) => {
           include: [{
             model: User,
             as: 'employee',
-            attributes: ['id', 'fullName', 'email', 'position', 'department']
+            attributes: ['id', 'fullName', 'email', 'position', 'department', 'profileImage']
           }]
         },
       ]

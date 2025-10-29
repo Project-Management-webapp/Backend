@@ -5,7 +5,7 @@ const Notification = require('../../model/notificationModel/notification');
 
 const handleAssignEmployeeToProject = async (req, res) => {
   try {
-    const { projectId, employeeId, role, allocatedAmount, paymentSchedule, paymentTerms, responsibilities, deliverables, responseDeadline } = req.body;
+    const { projectId, employeeId, role, allocatedAmount, paymentSchedule, paymentTerms, responsibilities, deliverables } = req.body;
     const assignedBy = req.user.id;
 
     if (!projectId || !employeeId) {
@@ -674,6 +674,81 @@ const handleGetCompletedProjects = async (req, res) => {
   }
 };
 
+const handleGetAllProjectAssignments = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    const { status, name } = req.query;
+    const where = {};
+
+    if (status) {
+      where.status = status;
+    }
+    if (name) {
+      where.name = { [Op.like]: `%${name}%` };
+    }
+    const { count, rows } = await Project.findAndCountAll({
+      where,
+      limit,
+      offset,
+      order: [['updatedAt', 'DESC']],
+      include: [
+        {
+          model: User,
+          as: 'creator', 
+          attributes: ['id', 'fullName', 'email', 'role']
+        },
+        {
+          model: ProjectAssignment,
+          as: 'assignments', 
+          required: false, 
+          include: [
+            {
+              model: User,
+              as: 'employee', 
+              attributes: ['id', 'fullName', 'email', 'position']
+            },
+            {
+              model: User,
+              as: 'assigner',
+              attributes: ['id', 'fullName', 'email']
+            }
+          ]
+        }
+      ],
+      distinct: true, 
+      col: 'id' 
+    });
+
+    const totalPages = Math.ceil(count / limit);
+
+    res.status(200).json({
+      success: true,
+      message: "Projects retrieved successfully",
+      data: {
+        projects: {
+          count: count,
+          rows: rows
+        },
+        pagination: {
+          totalPages: totalPages,
+          currentPage: page,
+          limit: limit,
+          totalProjects: count
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("Get all projects error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
 
 
 module.exports = {
@@ -687,4 +762,5 @@ module.exports = {
   handleGetOngoingProjects,
   handleGetCompletedProjects,
   handleToggleAssignmentStatus,
+  handleGetAllProjectAssignments
 };

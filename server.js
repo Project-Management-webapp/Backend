@@ -2,14 +2,18 @@ require("dotenv").config();
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
+const http = require("http");
+const { Server } = require("socket.io");
 const initDB = require("./mysqlConnection/dbinit");
 const milestoneReminderJob = require("./jobs/milestoneReminderJob");
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 8000;
 
 const allowedOrigins = [process.env.FRONTEND_URL];
 
+// CORS configuration for Express
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -25,6 +29,25 @@ app.use(
     credentials: true,
   })
 );
+
+// Socket.IO configuration
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
+
+// Make io accessible to routes
+app.set('io', io);
+
+// Middleware to attach io to every request
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -157,9 +180,69 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('✅ User connected:', socket.id);
+
+  // Join a project room
+  socket.on('join_project', (projectId) => {
+    // Ensure projectId is consistently a string
+    const projectIdStr = String(projectId);
+    const roomName = `project_${projectIdStr}`;
+    socket.join(roomName);
+    console.log(`📍 User ${socket.id} joined project room: ${roomName}`);
+    
+    // Log current rooms for this socket
+    console.log('Current rooms for socket:', Array.from(socket.rooms));
+    
+    // Get all clients in this room
+    const roomClients = io.sockets.adapter.rooms.get(roomName);
+    console.log(`👥 Total clients in ${roomName}:`, roomClients ? roomClients.size : 0);
+    
+    // Notify others in the room that someone joined
+    socket.to(roomName).emit('user_joined_room', { 
+      socketId: socket.id,
+      projectId: projectIdStr,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // Leave a project room
+  socket.on('leave_project', (projectId) => {
+    const projectIdStr = String(projectId);
+    const roomName = `project_${projectIdStr}`;
+    socket.leave(roomName);
+    console.log(`👋 User ${socket.id} left project room: ${roomName}`);
+    
+    // Get remaining clients
+    const roomClients = io.sockets.adapter.rooms.get(roomName);
+    console.log(`👥 Remaining clients in ${roomName}:`, roomClients ? roomClients.size : 0);
+  });
+
+  // User is typing
+  socket.on('typing', ({ projectId, userName }) => {
+    const projectIdStr = String(projectId);
+    const roomName = `project_${projectIdStr}`;
+    console.log(`⌨️ ${userName} is typing in ${roomName}`);
+    socket.to(roomName).emit('user_typing', { userName });
+  });
+
+  // User stopped typing
+  socket.on('stop_typing', ({ projectId }) => {
+    const projectIdStr = String(projectId);
+    const roomName = `project_${projectIdStr}`;
+    socket.to(roomName).emit('user_stop_typing');
+  });
+
+  socket.on('disconnect', () => {
+    console.log('❌ User disconnected:', socket.id);
+  });
+});
+
 initDB(() => {
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    console.log(`Socket.IO is ready for real-time connections`);
     milestoneReminderJob.start();
     console.log(' Milestone reminder cron job started (runs daily at 9:00 AM)');
   });

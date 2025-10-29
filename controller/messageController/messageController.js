@@ -12,12 +12,7 @@ const handleSendMessage = async (req, res) => {
 
     const senderId = req.user.id;
 
-    if (!content) {
-      return res.status(400).json({
-        success: false,
-        message: "Message content is required"
-      });
-    }
+ 
 
     if (!projectId) {
       return res.status(400).json({
@@ -51,7 +46,7 @@ const handleSendMessage = async (req, res) => {
         {
           model: User,
           as: 'sender',
-          attributes: ['id', 'fullName', 'email', 'profileImage']
+          attributes: ['id', 'fullName', 'email', 'profileImage', 'position']
         },
         {
           model: Project,
@@ -60,6 +55,36 @@ const handleSendMessage = async (req, res) => {
         },
       ]
     });
+
+    // Emit socket event for real-time message
+    const io = req.app.get('io') || req.io;
+    if (io) {
+      const projectIdStr = String(projectId);
+      const roomName = `project_${projectIdStr}`;
+      const roomClients = io.sockets.adapter.rooms.get(roomName);
+      const clientCount = roomClients ? roomClients.size : 0;
+      
+      console.log('🔔 Emitting new_message to room:', roomName);
+      console.log('👥 Clients in room:', clientCount);
+      console.log('📦 Message data:', JSON.stringify({
+        id: messageWithDetails.id,
+        senderId: messageWithDetails.senderId,
+        content: messageWithDetails.content,
+        projectId: projectIdStr
+      }));
+      
+      if (clientCount > 0) {
+        io.to(roomName).emit('new_message', {
+          message: messageWithDetails.toJSON ? messageWithDetails.toJSON() : messageWithDetails,
+          projectId: projectIdStr
+        });
+        console.log('✅ Event emitted successfully to', clientCount, 'clients');
+      } else {
+        console.log('⚠️ No clients in room', roomName);
+      }
+    } else {
+      console.log('⚠️ Socket.IO instance not found');
+    }
 
     res.status(201).json({
       success: true,
@@ -220,6 +245,19 @@ const handleUpdateMessage = async (req, res) => {
       ]
     });
 
+    // Emit socket event for real-time update
+    const io = req.app.get('io') || req.io;
+    if (io) {
+      console.log('🔔 Emitting message_updated to room:', `project_${updatedMessage.projectId}`);
+      io.to(`project_${updatedMessage.projectId}`).emit('message_updated', {
+        message: updatedMessage.toJSON ? updatedMessage.toJSON() : updatedMessage,
+        projectId: updatedMessage.projectId
+      });
+      console.log('✅ Update event emitted successfully');
+    } else {
+      console.log('⚠️ Socket.IO instance not found for update');
+    }
+
     res.status(200).json({
       success: true,
       message: "Message updated successfully",
@@ -259,7 +297,21 @@ const handleDeleteMessage = async (req, res) => {
       });
     }
 
+    const projectId = message.projectId;
     await message.destroy();
+
+    // Emit socket event for real-time deletion
+    const io = req.app.get('io') || req.io;
+    if (io) {
+      console.log('🔔 Emitting message_deleted to room:', `project_${projectId}`);
+      io.to(`project_${projectId}`).emit('message_deleted', {
+        messageId,
+        projectId
+      });
+      console.log('✅ Delete event emitted successfully');
+    } else {
+      console.log('⚠️ Socket.IO instance not found for delete');
+    }
 
     res.status(200).json({
       success: true,
@@ -336,7 +388,7 @@ const handleReplyToMessage = async (req, res) => {
       attachments: attachments.length > 0 ? attachments : null,
     });
 
-    // Fetch the created reply with full details
+    // Fetch the created reply with full details INCLUDING parent message
     const replyWithDetails = await Message.findOne({
       where: { id: replyMessage.id },
       include: [
@@ -349,9 +401,43 @@ const handleReplyToMessage = async (req, res) => {
           model: Project,
           as: 'project',
           attributes: ['id', 'name']
+        },
+        {
+          model: Message,
+          as: 'parentMessage',
+          attributes: ['id', 'content', 'createdAt', 'senderId'],
+          include: [
+            {
+              model: User,
+              as: 'sender',
+              attributes: ['id', 'fullName', 'email', 'profileImage']
+            }
+          ]
         }
       ]
     });
+
+    // Emit socket event for real-time reply
+    const io = req.app.get('io') || req.io;
+    if (io) {
+      const projectIdStr = String(parentMessage.projectId);
+      const roomName = `project_${projectIdStr}`;
+      
+      console.log('🔔 Emitting reply message to room:', roomName);
+      console.log('📦 Reply data:', {
+        replyId: replyWithDetails.id,
+        parentMessageId: messageId,
+        hasParentMessage: !!replyWithDetails.parentMessage
+      });
+      
+      io.to(roomName).emit('new_message', {
+        message: replyWithDetails.toJSON ? replyWithDetails.toJSON() : replyWithDetails,
+        projectId: projectIdStr
+      });
+      console.log('✅ Reply event emitted successfully');
+    } else {
+      console.log('⚠️ Socket.IO instance not found for reply');
+    }
 
     res.status(201).json({
       success: true,
