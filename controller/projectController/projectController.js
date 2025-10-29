@@ -124,7 +124,7 @@ const handleCreateProject = async (req, res) => {
       
       // Team Information
       teamSize: teamSize || null,
-      teamLead: teamLead || null,
+      teamLead: teamLead && !isNaN(parseInt(teamLead)) ? parseInt(teamLead) : null,
       
       // Visibility and Access
       visibility: visibility || 'internal',
