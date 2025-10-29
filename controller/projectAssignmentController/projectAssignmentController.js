@@ -363,7 +363,6 @@ const handleGetProjectTeammates = async (req, res) => {
 const handleSubmitWork = async (req, res) => {
   try {
     const { id } = req.params;
-    const { actualDeliverables } = req.body;
     const userId = req.user.id;
 
     const assignment = await ProjectAssignment.findByPk(id, {
@@ -395,7 +394,6 @@ const handleSubmitWork = async (req, res) => {
     // Update assignment
     assignment.workStatus = 'submitted';
     assignment.workSubmittedAt = new Date();
-    assignment.actualDeliverables = actualDeliverables;
     await assignment.save();
 
     // Notify ALL managers/admins about work submission (visible to all managers)
