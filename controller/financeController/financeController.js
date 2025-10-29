@@ -8,11 +8,22 @@ const { sequelize } = require('../../mysqlConnection/dbConnection');
 
 const handleGetFinancialOverview = async (req, res) => {
   try {
+    // Get all projects regardless of status (including empty status)
     const projects = await Project.findAll({
       where: {
-        status: {
-          [Op.in]: ['pending', 'in-progress', 'completed']
-        }
+        [Op.or]: [
+          {
+            status: {
+              [Op.in]: ['pending', 'in-progress', 'completed']
+            }
+          },
+          {
+            status: ''
+          },
+          {
+            status: null
+          }
+        ]
       }
     });
 
@@ -139,7 +150,7 @@ const handleGetFinancialOverview = async (req, res) => {
           remainingBudget: totalBudget - totalAllocatedToEmployees
         },
         byStatus: {
-          pending: projectFinancials.filter(p => p.status === 'pending').length,
+          pending: projectFinancials.filter(p => p.status === 'pending' || p.status === '' || p.status === null).length,
           inProgress: projectFinancials.filter(p => p.status === 'in-progress').length,
           completed: projectFinancials.filter(p => p.status === 'completed').length
         },

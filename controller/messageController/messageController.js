@@ -25,10 +25,24 @@ const handleSendMessage = async (req, res) => {
     let mentions = [];
     let mentionedUserIds = [];
     if (content) {
-      const mentionRegex = /@([A-Za-z]+(?:\s+[A-Za-z]+)*)/g;
-      const mentionMatches = content.match(mentionRegex);
+      console.log('🔍 Checking for mentions in content:', content);
+      // Match @Name (single word) or @FirstName LastName (exactly 2 words)
+      // The lookahead ensures we stop at: space+non-letter, non-letter, or end of string
+      // This handles: "@Raju hello", "@Raju", "@Raju.", "@Satish Manager hello"
+      const mentionRegex = /@([A-Za-z]+)(?:\s([A-Za-z]+))?(?=\s+[^A-Za-z]|\s*[^A-Za-z\s]|\s*$)/g;
+      let match;
+      const mentionMatches = [];
       
-      if (mentionMatches) {
+      // Use exec to get all matches
+      while ((match = mentionRegex.exec(content)) !== null) {
+        // match[1] is the first name, match[2] is the optional last name
+        const fullName = match[2] ? `${match[1]} ${match[2]}` : match[1];
+        mentionMatches.push(fullName);
+      }
+      
+      console.log('🔍 Mention matches found:', mentionMatches);
+      
+      if (mentionMatches && mentionMatches.length > 0) {
         // Get all users in the project to match mentions
         const project = await Project.findByPk(projectId, {
           include: [
@@ -51,13 +65,16 @@ const handleSendMessage = async (req, res) => {
             ...(project.creator ? [project.creator] : []),
             ...(project.assignedEmployees || [])
           ];
+          console.log('👥 Project users:', projectUsers.map(u => ({ id: u.id, fullName: u.fullName })));
 
           // Match mentioned names to actual users
-          mentionMatches.forEach(mention => {
-            const name = mention.substring(1); // Remove @ symbol
+          mentionMatches.forEach(mentionName => {
+            console.log('🔍 Looking for user with name:', mentionName);
             const matchedUser = projectUsers.find(user => 
-              user.fullName && user.fullName.toLowerCase() === name.toLowerCase()
+              user.fullName && user.fullName.toLowerCase() === mentionName.toLowerCase()
             );
+            console.log('👤 Matched user:', matchedUser ? { id: matchedUser.id, name: matchedUser.fullName } : 'Not found');
+            
             if (matchedUser && matchedUser.id !== senderId) {
               if (!mentionedUserIds.includes(matchedUser.id)) {
                 mentionedUserIds.push(matchedUser.id);
@@ -65,9 +82,15 @@ const handleSendMessage = async (req, res) => {
                   userId: matchedUser.id,
                   name: matchedUser.fullName
                 });
+                console.log('✅ Added to mentions:', matchedUser.fullName);
               }
+            } else if (matchedUser && matchedUser.id === senderId) {
+              console.log('⚠️ User mentioned themselves - skipping');
             }
           });
+          
+          console.log('📝 Final mentions array:', mentions);
+          console.log('📝 Final mentionedUserIds:', mentionedUserIds);
         }
       }
     }
@@ -134,6 +157,25 @@ const handleSendMessage = async (req, res) => {
         console.log('✅ Event emitted successfully to', clientCount, 'clients');
       } else {
         console.log('⚠️ No clients in room', roomName);
+      }
+
+      // Emit mention notifications to mentioned users (real-time @ indicator)
+      if (mentionedUserIds.length > 0) {
+        mentionedUserIds.forEach(userId => {
+          console.log('📤 Emitting new_mention:', {
+            userId: userId,
+            projectId: projectIdStr,
+            projectName: messageWithDetails.project.name,
+            senderName: messageWithDetails.sender.fullName
+          });
+          io.emit('new_mention', {
+            userId: userId,
+            projectId: projectIdStr,
+            projectName: messageWithDetails.project.name,
+            senderName: messageWithDetails.sender.fullName
+          });
+        });
+        console.log('📢 Emitted mention notifications to', mentionedUserIds.length, 'users');
       }
     } else {
       console.log('⚠️ Socket.IO instance not found');
@@ -534,6 +576,10 @@ const handleGetProjectsWithMentions = async (req, res) => {
     });
 
     const projectIds = messagesWithMentions.map(msg => msg.projectId);
+    
+    console.log('📊 handleGetProjectsWithMentions - userId:', userId);
+    console.log('📊 handleGetProjectsWithMentions - projectIds:', projectIds);
+    console.log('📊 handleGetProjectsWithMentions - projectIds types:', projectIds.map(id => typeof id));
 
     res.status(200).json({
       success: true,
