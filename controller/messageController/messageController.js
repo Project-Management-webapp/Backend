@@ -21,6 +21,57 @@ const handleSendMessage = async (req, res) => {
       });
     }
 
+    // Extract mentions from message content
+    let mentions = [];
+    let mentionedUserIds = [];
+    if (content) {
+      const mentionRegex = /@([A-Za-z]+(?:\s+[A-Za-z]+)*)/g;
+      const mentionMatches = content.match(mentionRegex);
+      
+      if (mentionMatches) {
+        // Get all users in the project to match mentions
+        const project = await Project.findByPk(projectId, {
+          include: [
+            {
+              model: User,
+              as: 'creator',
+              attributes: ['id', 'fullName']
+            },
+            {
+              model: User,
+              as: 'assignedEmployees',
+              attributes: ['id', 'fullName'],
+              through: { attributes: [] }
+            }
+          ]
+        });
+
+        if (project) {
+          const projectUsers = [
+            ...(project.creator ? [project.creator] : []),
+            ...(project.assignedEmployees || [])
+          ];
+
+          // Match mentioned names to actual users
+          mentionMatches.forEach(mention => {
+            const name = mention.substring(1); // Remove @ symbol
+            const matchedUser = projectUsers.find(user => 
+              user.fullName && user.fullName.toLowerCase() === name.toLowerCase()
+            );
+            if (matchedUser && matchedUser.id !== senderId) {
+              if (!mentionedUserIds.includes(matchedUser.id)) {
+                mentionedUserIds.push(matchedUser.id);
+                mentions.push({
+                  userId: matchedUser.id,
+                  name: matchedUser.fullName
+                });
+              }
+            }
+          });
+        }
+      }
+    }
+
     // Handle file attachments from Cloudinary upload
     let attachments = [];
     if (req.files && req.files.length > 0) {
@@ -38,6 +89,8 @@ const handleSendMessage = async (req, res) => {
       senderId,
       projectId,
       attachments: attachments.length > 0 ? attachments : null,
+      mentions: mentions.length > 0 ? mentions : null,
+      mentionedUserIds: mentionedUserIds.length > 0 ? mentionedUserIds : null,
     });
 
     const messageWithDetails = await Message.findOne({
@@ -463,10 +516,87 @@ const handleReplyToMessage = async (req, res) => {
   }
 };
 
+// Get projects with unread mentions for current user
+const handleGetProjectsWithMentions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Find all messages where user is mentioned and hasn't viewed yet
+    const messagesWithMentions = await Message.findAll({
+      where: {
+        mentionedUserIds: {
+          [Op.like]: `%${userId}%`
+        }
+      },
+      attributes: ['projectId'],
+      group: ['projectId'],
+      raw: true
+    });
+
+    const projectIds = messagesWithMentions.map(msg => msg.projectId);
+
+    res.status(200).json({
+      success: true,
+      data: projectIds
+    });
+
+  } catch (error) {
+    console.error("Get projects with mentions error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
+// Mark mentions as viewed when user opens a project
+const handleMarkMentionsAsViewed = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { projectId } = req.params;
+
+    // Find all messages in this project where user is mentioned
+    const messages = await Message.findAll({
+      where: {
+        projectId,
+        mentionedUserIds: {
+          [Op.like]: `%${userId}%`
+        }
+      }
+    });
+
+    // Remove userId from mentionedUserIds array for each message
+    for (const message of messages) {
+      if (message.mentionedUserIds && Array.isArray(message.mentionedUserIds)) {
+        const updatedMentionedUserIds = message.mentionedUserIds.filter(id => id !== userId);
+        await message.update({
+          mentionedUserIds: updatedMentionedUserIds.length > 0 ? updatedMentionedUserIds : null
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Mentions marked as viewed"
+    });
+
+  } catch (error) {
+    console.error("Mark mentions as viewed error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   handleSendMessage,
   handleGetProjectMessages,
   handleUpdateMessage,
   handleDeleteMessage,
-  handleReplyToMessage
+  handleReplyToMessage,
+  handleGetProjectsWithMentions,
+  handleMarkMentionsAsViewed
 };

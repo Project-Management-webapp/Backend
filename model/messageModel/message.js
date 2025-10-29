@@ -52,6 +52,16 @@ const Message = sequelize.define('Message', {
     allowNull: true,
     comment: 'When the message was last edited'
   },
+  mentions: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'Array of user IDs mentioned in this message'
+  },
+  mentionedUserIds: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'Array of user IDs who were mentioned and have not yet viewed this message'
+  },
 }, {
   tableName: 'messages',
   timestamps: true,

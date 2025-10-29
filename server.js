@@ -181,16 +181,32 @@ app.get("/api/health", (req, res) => {
 });
 
 // Socket.IO connection handling
+// Track online users: { userId: { socketId, userName, userRole } }
+const onlineUsers = new Map();
+
 io.on('connection', (socket) => {
   console.log('✅ User connected:', socket.id);
 
+  // Register user as online
+  socket.on('user_online', ({ userId, userName, userRole }) => {
+    onlineUsers.set(userId, { socketId: socket.id, userName, userRole });
+    console.log(`🟢 User ${userName} (${userId}) is now online`);
+    
+    // Broadcast to all clients that this user is online
+    io.emit('user_status_changed', { userId, status: 'online', userName });
+  });
+
   // Join a project room
-  socket.on('join_project', (projectId) => {
+  socket.on('join_project', ({ projectId, userId }) => {
     // Ensure projectId is consistently a string
     const projectIdStr = String(projectId);
     const roomName = `project_${projectIdStr}`;
     socket.join(roomName);
-    console.log(`📍 User ${socket.id} joined project room: ${roomName}`);
+    
+    // Store userId with socket for this room
+    socket.userId = userId;
+    
+    console.log(`📍 User ${userId} (${socket.id}) joined project room: ${roomName}`);
     
     // Log current rooms for this socket
     console.log('Current rooms for socket:', Array.from(socket.rooms));
@@ -202,6 +218,7 @@ io.on('connection', (socket) => {
     // Notify others in the room that someone joined
     socket.to(roomName).emit('user_joined_room', { 
       socketId: socket.id,
+      userId,
       projectId: projectIdStr,
       timestamp: new Date().toISOString()
     });
@@ -236,6 +253,24 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('❌ User disconnected:', socket.id);
+    
+    // Find and remove user from online users
+    for (const [userId, userData] of onlineUsers.entries()) {
+      if (userData.socketId === socket.id) {
+        onlineUsers.delete(userId);
+        console.log(`🔴 User ${userData.userName} (${userId}) is now offline`);
+        
+        // Broadcast to all clients that this user is offline
+        io.emit('user_status_changed', { userId, status: 'offline', userName: userData.userName });
+        break;
+      }
+    }
+  });
+  
+  // Get online status for specific user
+  socket.on('check_user_status', ({ userId }, callback) => {
+    const isOnline = onlineUsers.has(userId);
+    callback({ userId, status: isOnline ? 'online' : 'offline' });
   });
 });
 

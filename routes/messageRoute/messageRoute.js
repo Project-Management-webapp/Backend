@@ -4,7 +4,9 @@ const {
   handleGetProjectMessages,
   handleUpdateMessage,
   handleDeleteMessage,
-  handleReplyToMessage
+  handleReplyToMessage,
+  handleGetProjectsWithMentions,
+  handleMarkMentionsAsViewed
 } = require('../../controller/messageController/messageController');
 const upload = require('../../cloudinaryServices/upload');
 
@@ -16,5 +18,7 @@ router.get('/project/:projectId', handleGetProjectMessages);
 router.put('/:messageId', handleUpdateMessage);
 router.delete('/:messageId', handleDeleteMessage);
 router.post('/:messageId/reply', upload.array('attachments', 5), handleReplyToMessage);
+router.get('/mentions/projects', handleGetProjectsWithMentions);
+router.post('/mentions/viewed/:projectId', handleMarkMentionsAsViewed);
 
 module.exports = router;
