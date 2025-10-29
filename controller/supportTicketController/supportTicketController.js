@@ -54,25 +54,27 @@ async function handleCreateTicket(req, res) {
       status: 'open',
     });
 
-    // Notify all admins and managers
-    const adminsAndManagers = await User.findAll({
-      where: {
-        role: { [Op.in]: ['admin', 'manager'] },
-        isActive: true,
-      }
-    });
+    // Get employee name for notification
+    const employee = await User.findByPk(employeeId);
 
-    const notifications = adminsAndManagers.map(user => ({
-      userId: user.id,
+    // Notify ALL managers/admins about new ticket (visible to all managers/admins)
+    await Notification.create({
+      userId: employeeId, // Set employee as primary recipient (though managers will see it)
       title: 'New Support Ticket',
-      message: `New ticket ${ticketId}: ${subject}`,
+      message: `New ticket ${ticketId} from ${employee.fullName}: ${subject}`,
       type: 'system',
       relatedId: ticket.id,
       relatedType: 'ticket',
       priority: priority || 'medium',
-    }));
-
-    await Notification.bulkCreate(notifications);
+      targetRole: 'all_managers', // Make visible to all managers/admins
+      metadata: {
+        ticketId,
+        employeeId,
+        employeeName: employee.fullName,
+        category: category || 'other',
+        subject
+      }
+    });
 
     // Fetch complete ticket with relations
     const createdTicket = await SupportTicket.findByPk(ticket.id, {

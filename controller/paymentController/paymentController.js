@@ -272,15 +272,23 @@ const handleRequestPayment = async (req, res) => {
     employee.pendingEarnings = parseFloat(employee.pendingEarnings || 0) + parseFloat(assignment.allocatedAmount);
     await employee.save();
 
-    // Notify manager/project creator
+    // Notify ALL managers/admins about payment request (visible to all managers)
     await Notification.create({
-      userId: assignment.project.createdBy,
+      userId: assignment.project.createdBy, // Still set creator as primary recipient
       title: 'Payment Request',
-      message: `Employee requested payment of ${assignment.allocatedAmount} ${assignment.currency} for project: ${assignment.project.name}`,
+      message: `${employee.fullName} requested payment of ${assignment.allocatedAmount} ${assignment.currency} for project: ${assignment.project.name}`,
       type: 'payment',
       relatedId: payment.id,
       relatedType: 'payment',
-      priority: 'high'
+      priority: 'high',
+      targetRole: 'all_managers', // Make visible to all managers/admins
+      metadata: {
+        employeeId: userId,
+        employeeName: employee.fullName,
+        projectId: assignment.projectId,
+        projectName: assignment.project.name,
+        amount: assignment.allocatedAmount
+      }
     });
 
     res.status(201).json({

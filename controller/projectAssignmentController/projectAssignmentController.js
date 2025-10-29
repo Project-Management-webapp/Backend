@@ -398,15 +398,24 @@ const handleSubmitWork = async (req, res) => {
     assignment.actualDeliverables = actualDeliverables;
     await assignment.save();
 
-    // Notify manager/creator
+    // Notify ALL managers/admins about work submission (visible to all managers)
+    const employee = await User.findByPk(assignment.employeeId);
     await Notification.create({
-      userId: assignment.project.createdBy,
+      userId: assignment.project.createdBy, // Still set creator as primary recipient
       title: 'Work Submitted',
-      message: `Employee has submitted completed work for project: ${assignment.project.name}.`,
+      message: `${employee.fullName} has submitted completed work for project: ${assignment.project.name}.`,
       type: 'project_assignment',
       relatedId: assignment.projectId,
       relatedType: 'project',
-      priority: 'high'
+      priority: 'high',
+      targetRole: 'all_managers', // Make visible to all managers/admins
+      metadata: {
+        employeeId: assignment.employeeId,
+        employeeName: employee.fullName,
+        projectId: assignment.projectId,
+        projectName: assignment.project.name,
+        assignmentId: assignment.id
+      }
     });
 
     res.status(200).json({

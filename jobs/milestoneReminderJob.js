@@ -134,16 +134,17 @@ const milestoneReminderJob = cron.schedule('0 9 * * *', async () => {
             }
           }
 
-          // Send notification to project manager/creator
+          // Send notification to ALL managers/admins (visible to all managers)
           if (project.createdBy) {
             await Notification.create({
-              userId: project.createdBy,
+              userId: project.createdBy, // Set creator as primary recipient
               title: notificationTitle,
-              message: notificationMessage,
+              message: `${notificationMessage} (${assignments.length} employee(s) assigned)`,
               type: 'milestone_reminder',
               relatedId: project.id,
               relatedType: 'project',
               priority: isToday ? 'urgent' : 'high',
+              targetRole: 'all_managers', // Make visible to all managers/admins
               metadata: {
                 projectId: project.id,
                 projectName: project.name,
