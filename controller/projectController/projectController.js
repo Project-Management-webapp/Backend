@@ -533,11 +533,78 @@ const handleGetMyProjects = async (req, res) => {
   }
 };
 
+/**
+ * Mark project as completed
+ */
+const handleMarkProjectAsCompleted = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    // Find the project
+    const project = await Project.findOne({
+      where: { id: projectId }
+    });
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found"
+      });
+    }
+
+
+    // Check if project is already completed
+    if (project.status === 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: "Project is already marked as completed"
+      });
+    }
+
+    // Update project status to completed and set actualEndDate
+    await project.update({
+      status: 'completed',
+      actualEndDate: new Date()
+    });
+
+    // // Optionally, you can also update all project assignments to completed
+    // await ProjectAssignment.update(
+    //   { workStatus: 'completed' },
+    //   { 
+    //     where: { 
+    //       projectId: projectId,
+    //       workStatus: { [Op.ne]: 'completed' }
+    //     } 
+    //   }
+    // );
+
+    return res.status(200).json({
+      success: true,
+      message: "Project marked as completed successfully",
+      data: {
+        projectId: project.id,
+        projectName: project.name,
+        status: project.status,
+        actualEndDate: project.actualEndDate
+      }
+    });
+
+  } catch (error) {
+    console.error("Mark project as completed error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   handleCreateProject,
   handleGetAllProjects,
   handleGetProjectById,
   handleUpdateProject,
   handleDeleteProject,
-  handleGetMyProjects
+  handleGetMyProjects,
+  handleMarkProjectAsCompleted
 };

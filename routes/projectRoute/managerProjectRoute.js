@@ -5,6 +5,7 @@ const {
   handleUpdateProject,
   handleDeleteProject,
   handleGetProjectById,
+  handleMarkProjectAsCompleted,
 } = require("../../controller/projectController/projectController");
 const { authorizeRoles } = require("../../middleware/roleMiddleware");
 
@@ -15,5 +16,6 @@ router.get("/", authorizeRoles(["manager"]), handleGetAllProjects);
 router.get("/:projectId", authorizeRoles(["manager"]), handleGetProjectById);
 router.put("/:projectId", authorizeRoles(["manager"]), handleUpdateProject);
 router.delete("/:projectId", authorizeRoles(["manager"]), handleDeleteProject);
+router.patch("/:projectId/mark-completed", authorizeRoles(["manager", "admin"]), handleMarkProjectAsCompleted);
 
 module.exports = router;
