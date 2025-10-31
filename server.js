@@ -73,6 +73,7 @@ const employeeStatsRoutes = require("./routes/statsRoute/employeeStatsRoute");
 const managerStatsRoutes = require("./routes/statsRoute/managerStatsRoute");
 const managerFinanceRoutes = require("./routes/financeRoute/managerFinanceRoute");
 const { checkForAuthenticationCookie } = require("./middleware/authMiddleware");
+const gemniRoutes = require("./routes/aiRoute/gemniRoute");
 
 app.use("/api/auth", employeeAuthRoutes, managerAuthRoutes, commonAuthRoutes);
 
@@ -174,6 +175,10 @@ app.use(
   "/api/manager/finance",
   checkForAuthenticationCookie("token"),
   managerFinanceRoutes
+);
+app.use(
+  "/api/ai",
+  gemniRoutes
 );
 
 
