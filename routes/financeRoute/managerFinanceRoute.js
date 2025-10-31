@@ -4,7 +4,8 @@ const {
   handleGetFinancialOverview,
   handleGetProjectProfitLoss,
   handleGetIncomeSummary,
-  handleGetEmployeeAllocations
+  handleGetEmployeeAllocations,
+  handleGetResourceComparison
 } = require('../../controller/financeController/financeController');
 const { authorizeRoles } = require('../../middleware/roleMiddleware');
 
@@ -20,5 +21,8 @@ router.get('/income-summary', authorizeRoles(['manager']),handleGetIncomeSummary
 
 // Track allocated amounts given to employees
 router.get('/employee-allocations',   authorizeRoles(['manager']),handleGetEmployeeAllocations);
+
+// Detailed resource comparison and tracking (hours, consumables, materials)
+router.get('/projects/:projectId/resource-comparison',  authorizeRoles(['manager']), handleGetResourceComparison);
 
 module.exports = router;
