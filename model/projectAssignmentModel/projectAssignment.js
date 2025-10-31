@@ -45,6 +45,45 @@ const ProjectAssignment = sequelize.define('ProjectAssignment', {
       key: 'id',
     },
   },
+
+
+  estimatedHours: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: 0.0,
+      comment: "Estimated total hours for project completion",
+    },
+    actualHours: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: 0.0,
+      comment: "Actual hours spent on project",
+    },
+
+    estimatedConsumables: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: 'Array of project Consumables'
+    },
+    actualConsumables: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment:
+        "Array of project Consumables",
+    },
+    
+    estimatedMaterials: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: 'Array of project Materials'
+    },
+    actualMaterials: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment:
+        "Array of project Materials",
+},
+
   // Payment Allocation from Project Budget
   allocatedAmount: {
     type: DataTypes.DECIMAL(10, 2),

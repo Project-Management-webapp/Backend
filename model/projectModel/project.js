@@ -63,8 +63,19 @@ const Project = sequelize.define('Project', {
   },
     actualConsumables: {
     type: DataTypes.JSON,
-    allowNull: false,
+    allowNull: true,
   },
+  estimatedMaterials: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: 'Array of project Materials'
+    },
+    actualMaterials: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment:
+        "Array of project Materials",
+},
 
   
   // Status and Progress

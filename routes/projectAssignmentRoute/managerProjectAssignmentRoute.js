@@ -23,7 +23,7 @@ router.get(
 );
 router.put(
   "/:assignmentId/role",
-  authorizeRoles(["manager"]),
+  authorizeRoles(["manager","employee"]),
   handleUpdateAssignmentRole
 );
 router.delete(

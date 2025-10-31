@@ -15,12 +15,14 @@ const handleCreateProject = async (req, res) => {
       // Timeline Information
       startDate,
       deadline,
-      actualStartDate,
-      actualEndDate,
+//actualStartDate,
+//actualEndDate,
       estimatedHours,
-      actualHours,
+//actualHours,
       estimatedConsumables,
-      actualConsumables,
+//actualConsumables,
+
+    estimatedMaterials,
       
       // Status and Progress
       status,
@@ -83,12 +85,14 @@ const handleCreateProject = async (req, res) => {
       // Timeline Information
       startDate,
       deadline,
-      actualStartDate: actualStartDate || null,
-      actualEndDate: actualEndDate || null,
+      // actualStartDate: actualStartDate || null,
+      // actualEndDate: actualEndDate || null,
       estimatedHours: estimatedHours || 0,
-      actualHours: actualHours || 0,
+      // actualHours: actualHours || 0,
       estimatedConsumables: estimatedConsumables || [],
-      actualConsumables: actualConsumables || [],
+      // actualConsumables: actualConsumables || [],
+
+      estimatedMaterials: estimatedMaterials || [],
       
       // Status and Progress
       status: status || 'pending',
@@ -302,6 +306,8 @@ const handleUpdateProject = async (req, res) => {
       actualHours,
       estimatedConsumables,
       actualConsumables,
+      actualMaterials,
+      estimatedMaterials,
       
       // Status and Progress
       status,
@@ -386,6 +392,8 @@ const handleUpdateProject = async (req, res) => {
     if (actualHours !== undefined) updateData.actualHours = actualHours;
     if (estimatedConsumables !== undefined) updateData.estimatedConsumables = estimatedConsumables;
     if (actualConsumables !== undefined) updateData.actualConsumables = actualConsumables;
+    if (estimatedMaterials !== undefined) updateData.estimatedMaterials = estimatedMaterials;
+    if (actualMaterials !== undefined) updateData.actualMaterials = actualMaterials;
     
     // Status and Progress
     if (status !== undefined) updateData.status = status;

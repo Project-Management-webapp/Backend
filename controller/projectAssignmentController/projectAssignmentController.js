@@ -5,7 +5,7 @@ const Notification = require('../../model/notificationModel/notification');
 
 const handleAssignEmployeeToProject = async (req, res) => {
   try {
-    const { projectId, employeeId, role, allocatedAmount, paymentSchedule, paymentTerms, responsibilities, deliverables } = req.body;
+    const { projectId, employeeId, role, allocatedAmount, paymentSchedule, paymentTerms, responsibilities, deliverables,estimatedHours,estimatedConsumables,estimatedMaterials } = req.body;
     const assignedBy = req.user.id;
 
     if (!projectId || !employeeId) {
@@ -94,6 +94,9 @@ const handleAssignEmployeeToProject = async (req, res) => {
       deliverables,
       assignmentStatus: 'pending',
       workStatus: 'in_progress',
+      estimatedHours: estimatedHours || 0,
+      estimatedConsumables: estimatedConsumables || [],
+      estimatedMaterials: estimatedMaterials || []
     });
 
     // Update project allocated amount
@@ -253,14 +256,8 @@ const handleRemoveEmployeeFromProject = async (req, res) => {
 const handleUpdateAssignmentRole = async (req, res) => {
   try {
     const { assignmentId } = req.params;
-    const { role } = req.body;
+    const { role,actualHours,actualConsumables,actualMaterials } = req.body;
 
-    if (!role) {
-      return res.status(400).json({
-        success: false,
-        message: "Role is required"
-      });
-    }
 
     const assignment = await ProjectAssignment.findByPk(assignmentId);
 
@@ -270,8 +267,8 @@ const handleUpdateAssignmentRole = async (req, res) => {
         message: "Assignment not found"
       });
     }
-
-    await assignment.update({ role });
+  
+    await assignment.update({ role,actualHours,actualConsumables,actualMaterials });
 
     const updatedAssignment = await ProjectAssignment.findOne({
       where: { id: assignmentId },
