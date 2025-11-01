@@ -3,9 +3,33 @@ const Project = require('../../model/projectModel/project');
 const User = require('../../model/userModel/user');
 const Notification = require('../../model/notificationModel/notification');
 
+// Helper function to calculate allocated amount
+// Formula: allocatedAmount = rate * estimatedHours + estimatedMaterials + estimatedConsumables
+const calculateAllocatedAmount = (estimatedHours, rate, estimatedConsumables, estimatedMaterials) => {
+  const hours = parseFloat(estimatedHours) || 0;
+  const hourlyRate = parseFloat(rate) || 0;
+  const consumables = parseFloat(estimatedConsumables) || 0;
+  const materials = parseFloat(estimatedMaterials) || 0;
+  
+  const totalAmount = (hours * hourlyRate) + consumables + materials;
+  return parseFloat(totalAmount.toFixed(2));
+};
+
 const handleAssignEmployeeToProject = async (req, res) => {
   try {
-    const { projectId, employeeId, role, allocatedAmount, paymentSchedule, paymentTerms, responsibilities, deliverables,estimatedHours,estimatedConsumables,estimatedMaterials } = req.body;
+    const { 
+      projectId, 
+      employeeId, 
+      role, 
+      paymentSchedule, 
+      paymentTerms, 
+      responsibilities, 
+      deliverables,
+      estimatedHours,
+      estimatedConsumables,
+      estimatedMaterials,
+      rate
+    } = req.body;
     const assignedBy = req.user.id;
 
     if (!projectId || !employeeId) {
@@ -15,10 +39,18 @@ const handleAssignEmployeeToProject = async (req, res) => {
       });
     }
 
-    if (!allocatedAmount || allocatedAmount <= 0) {
+    // Auto-calculate allocated amount
+    const allocatedAmount = calculateAllocatedAmount(
+      estimatedHours,
+      rate,
+      estimatedConsumables,
+      estimatedMaterials
+    );
+
+    if (allocatedAmount <= 0) {
       return res.status(400).json({
         success: false,
-        message: "Allocated amount is required and must be greater than 0"
+        message: "Allocated amount must be greater than 0. Please provide valid estimatedHours, rate, estimatedConsumables, or estimatedMaterials."
       });
     }
 
@@ -92,11 +124,11 @@ const handleAssignEmployeeToProject = async (req, res) => {
       paymentTerms,
       responsibilities,
       deliverables,
-      assignmentStatus: 'pending',
-      workStatus: 'in_progress',
+      workStatus: 'not_started',
       estimatedHours: estimatedHours || 0,
-      estimatedConsumables: estimatedConsumables || [],
-      estimatedMaterials: estimatedMaterials || []
+      estimatedConsumables: estimatedConsumables || 0,
+      estimatedMaterials: estimatedMaterials || 0,
+      rate: rate || 0
     });
 
     // Update project allocated amount
@@ -256,8 +288,7 @@ const handleRemoveEmployeeFromProject = async (req, res) => {
 const handleUpdateAssignmentRole = async (req, res) => {
   try {
     const { assignmentId } = req.params;
-    const { role,actualHours,actualConsumables,actualMaterials } = req.body;
-
+    const { role, actualHours, actualConsumables, actualMaterials } = req.body;
 
     const assignment = await ProjectAssignment.findByPk(assignmentId);
 
@@ -267,8 +298,41 @@ const handleUpdateAssignmentRole = async (req, res) => {
         message: "Assignment not found"
       });
     }
-  
-    await assignment.update({ role,actualHours,actualConsumables,actualMaterials });
+
+    // Recalculate allocated amount based on actual values
+    // Formula: allocatedAmount = actualHours * rate + actualConsumables + actualMaterials
+    const hours = parseFloat(actualHours !== undefined ? actualHours : assignment.actualHours) || 0;
+    const rate = parseFloat(assignment.rate) || 0;
+    const consumables = parseFloat(actualConsumables !== undefined ? actualConsumables : assignment.actualConsumables) || 0;
+    const materials = parseFloat(actualMaterials !== undefined ? actualMaterials : assignment.actualMaterials) || 0;
+    
+    const recalculatedAllocatedAmount = (hours * rate) + consumables + materials;
+
+    // Prepare update data
+    const updateData = {
+      role,
+      actualHours: hours,
+      actualConsumables: consumables,
+      actualMaterials: materials,
+      allocatedAmount: parseFloat(recalculatedAllocatedAmount.toFixed(2))
+    };
+
+    // Update the assignment
+    await assignment.update(updateData);
+
+    // Update project's total allocated amount
+    const project = await Project.findByPk(assignment.projectId);
+    if (project) {
+      const totalAllocated = await ProjectAssignment.sum('allocatedAmount', {
+        where: { 
+          projectId: assignment.projectId,
+          isActive: true
+        }
+      }) || 0;
+      
+      project.allocatedAmount = parseFloat(totalAllocated);
+      await project.save();
+    }
 
     const updatedAssignment = await ProjectAssignment.findOne({
       where: { id: assignmentId },
@@ -288,7 +352,7 @@ const handleUpdateAssignmentRole = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Assignment role updated successfully",
+      message: "Assignment updated successfully with recalculated allocation amount",
       data: updatedAssignment
     });
 
@@ -353,9 +417,6 @@ const handleGetProjectTeammates = async (req, res) => {
     });
   }
 };
-
-
-
 
 const handleSubmitWork = async (req, res) => {
   try {
@@ -429,7 +490,6 @@ const handleSubmitWork = async (req, res) => {
   }
 };
 
-
 const handleGetMyAssignmentById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -477,8 +537,6 @@ const handleGetMyAssignmentById = async (req, res) => {
     });
   }
 };
-
-
 
 // Admin: Toggle assignment active status (disable/enable)
 const handleToggleAssignmentStatus = async (req, res) => {
@@ -552,7 +610,7 @@ const handleToggleAssignmentStatus = async (req, res) => {
   }
 };
 
-// Get ongoing projects for the logged-in employee (accepted and in progress)
+// Get ongoing projects for the logged-in employee (not_started and in_progress)
 const handleGetOngoingProjects = async (req, res) => {
   try {
     const employeeId = req.user.id;
@@ -560,7 +618,7 @@ const handleGetOngoingProjects = async (req, res) => {
     const ongoingAssignments = await ProjectAssignment.findAll({
       where: {
         employeeId,
-        workStatus: ['in_progress'],
+        workStatus: ['not_started', 'in_progress'],
         isActive: true
       },
       include: [
@@ -580,6 +638,7 @@ const handleGetOngoingProjects = async (req, res) => {
 
     // Calculate progress statistics
     const totalAssignments = ongoingAssignments.length;
+    const notStarted = ongoingAssignments.filter(a => a.workStatus === 'not_started').length;
     const inProgress = ongoingAssignments.filter(a => a.workStatus === 'in_progress').length;
     
     // Calculate total allocated amount
@@ -590,6 +649,7 @@ const handleGetOngoingProjects = async (req, res) => {
       message: "Ongoing projects retrieved successfully",
       summary: {
         totalOngoing: totalAssignments,
+        notStarted,
         inProgress,
         totalAllocatedAmount: totalAllocated
       },
