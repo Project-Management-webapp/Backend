@@ -41,7 +41,7 @@ const ProjectAssignment = sequelize.define(
     },
     assignedBy: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true, // Changed to true to support ON DELETE SET NULL
       references: {
         model: "users",
         key: "id",
@@ -94,6 +94,12 @@ const ProjectAssignment = sequelize.define(
       allowNull: false,
       defaultValue: 0.0,
       comment: "Amount allocated to this employee from project budget",
+    },
+    actualAmount: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0.0,
+      comment: "Amount actually paid to this employee from project budget",
     },
     currency: {
       type: DataTypes.STRING(10),

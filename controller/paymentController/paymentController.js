@@ -49,6 +49,11 @@ const handleGetAllPayments = async (req, res) => {
           model: User,
           as: 'manager',
           attributes: ['id', 'fullName', 'email']
+        },
+        {
+          model: ProjectAssignment,
+          as: 'assignment',
+          attributes: ['id', 'allocatedAmount', 'actualAmount', 'actualHours', 'actualConsumables', 'actualMaterials', 'rate']
         }
       ],
     
@@ -85,7 +90,7 @@ const handleGetPaymentById = async (req, res) => {
         {
           model: User,
           as: 'employee',
-          attributes: ['id', 'fullName', 'email', 'position', 'department', 'bankAccountNumber']
+          attributes: ['id', 'fullName', 'email', 'position', 'department']
         },
         {
           model: Project,
@@ -96,6 +101,11 @@ const handleGetPaymentById = async (req, res) => {
           model: User,
           as: 'manager',
           attributes: ['id', 'fullName', 'email']
+        },
+        {
+          model: ProjectAssignment,
+          as: 'assignment',
+          attributes: ['id', 'allocatedAmount', 'actualAmount', 'actualHours', 'actualConsumables', 'actualMaterials', 'rate']
         }
       ]
     });
@@ -158,6 +168,11 @@ const handleGetMyPayments = async (req, res) => {
           model: User,
           as: 'manager',
           attributes: ['id', 'fullName', 'email']
+        },
+        {
+          model: ProjectAssignment,
+          as: 'assignment',
+          attributes: ['id', 'allocatedAmount', 'actualAmount', 'actualHours', 'actualConsumables', 'actualMaterials', 'rate']
         }
       ],
       order: [['createdAt', 'DESC']]
@@ -189,16 +204,22 @@ const handleGetMyPayments = async (req, res) => {
 };
 
 
-
 const handleRequestPayment = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { assignmentId, requestNotes } = req.body;
+    const { assignmentId, requestedAmount, requestNotes } = req.body;
 
     if (!assignmentId) {
       return res.status(400).json({
         success: false,
         message: "Assignment ID is required"
+      });
+    }
+
+    if (!requestedAmount || requestedAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid requested amount is required"
       });
     }
 
@@ -250,12 +271,23 @@ const handleRequestPayment = async (req, res) => {
       });
     }
 
-    // Create payment request
+    // Calculate actual amount from assignment
+    const actualHours = parseFloat(assignment.actualHours || 0);
+    const rate = parseFloat(assignment.rate || 0);
+    const actualConsumables = parseFloat(assignment.actualConsumables || 0);
+    const actualMaterials = parseFloat(assignment.actualMaterials || 0);
+    const calculatedActualAmount = (actualHours * rate) + actualConsumables + actualMaterials;
+
+    // Create payment request with both allocated and requested amounts
     const payment = await Payment.create({
       employeeId: userId,
       projectId: assignment.projectId,
       assignmentId,
-      amount: assignment.allocatedAmount,
+      allocatedAmount: assignment.allocatedAmount, // Store allocated amount for reference
+      requestedAmount: requestedAmount, // Amount requested by employee (should be actual amount)
+      amount: requestedAmount, // Initial amount (will be updated by manager on approval)
+      calculatedActualAmount: calculatedActualAmount, // Store calculated actual amount for reference
+      approvedAmount: null, // Will be set by manager on approval
       currency: assignment.currency || 'USD',
       paymentType: 'project_payment',
       paymentMethod: 'bank_transfer',
@@ -267,16 +299,16 @@ const handleRequestPayment = async (req, res) => {
       description: `Payment for project: ${assignment.project.name}`,
     });
 
-    // Update employee's pending earnings
+    // Update employee's pending earnings (based on requested amount)
     const employee = await User.findByPk(userId);
-    employee.pendingEarnings = parseFloat(employee.pendingEarnings || 0) + parseFloat(assignment.allocatedAmount);
+    employee.pendingEarnings = parseFloat(employee.pendingEarnings || 0) + parseFloat(requestedAmount);
     await employee.save();
 
     // Notify ALL managers/admins about payment request (visible to all managers)
     await Notification.create({
       userId: assignment.project.createdBy, // Still set creator as primary recipient
       title: 'Payment Request',
-      message: `${employee.fullName} requested payment of ${assignment.allocatedAmount} ${assignment.currency} for project: ${assignment.project.name}`,
+      message: `${employee.fullName} requested payment of ${requestedAmount} ${assignment.currency} for project: ${assignment.project.name}`,
       type: 'payment',
       relatedId: payment.id,
       relatedType: 'payment',
@@ -287,14 +319,23 @@ const handleRequestPayment = async (req, res) => {
         employeeName: employee.fullName,
         projectId: assignment.projectId,
         projectName: assignment.project.name,
-        amount: assignment.allocatedAmount
+        allocatedAmount: assignment.allocatedAmount,
+        requestedAmount: requestedAmount,
+        calculatedActualAmount: calculatedActualAmount
       }
     });
 
     res.status(201).json({
       success: true,
       message: "Payment requested successfully. Waiting for manager approval.",
-      payment
+      payment: {
+        ...payment.toJSON(),
+        assignmentDetails: {
+          allocatedAmount: assignment.allocatedAmount,
+          requestedAmount: requestedAmount,
+          calculatedActualAmount: calculatedActualAmount
+        }
+      }
     });
 
   } catch (error) {
@@ -310,10 +351,17 @@ const handleRequestPayment = async (req, res) => {
 const handleApprovePaymentRequest = async (req, res) => {
   try {
     const { id } = req.params;
-    const { approvalNotes, transactionId, transactionProofLink } = req.body;
+    const { approvalNotes, transactionId, transactionProofLink, actualAmount } = req.body;
     const userId = req.user.id;
 
-    // Validation: Transaction proof is required
+    // Validation: Actual amount and transaction proof are required
+    if (!actualAmount || actualAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Actual amount is required and must be greater than 0"
+      });
+    }
+
     if (!transactionId && !transactionProofLink) {
       return res.status(400).json({
         success: false,
@@ -350,9 +398,23 @@ const handleApprovePaymentRequest = async (req, res) => {
       });
     }
 
-    // Update payment - approve and mark as paid with transaction proof
+    // Store the originally requested amount for tracking
+    const originalRequestedAmount = payment.requestedAmount || payment.amount;
+
+    // Update ProjectAssignment actualAmount (Manager's final approved amount)
+    if (payment.assignmentId) {
+      const assignment = await ProjectAssignment.findByPk(payment.assignmentId);
+      if (assignment) {
+        assignment.actualAmount = actualAmount;
+        await assignment.save();
+      }
+    }
+
+    // Update payment - approve with manager's decided amount
     payment.requestStatus = 'paid';
     payment.status = 'completed';
+    payment.approvedAmount = actualAmount; // Amount approved by manager
+    payment.amount = actualAmount; // Final payment amount
     payment.approvedAt = new Date();
     payment.managerId = userId;
     payment.approvalNotes = approvalNotes;
@@ -360,21 +422,27 @@ const handleApprovePaymentRequest = async (req, res) => {
     payment.transactionProofLink = transactionProofLink;
     await payment.save();
 
-    // Update employee's earnings
+    // Update employee's earnings based on approved amount
     const employee = await User.findByPk(payment.employeeId);
     if (employee) {
-      // Update total earnings
-      employee.totalEarnings = parseFloat(employee.totalEarnings || 0) + parseFloat(payment.amount);
+      // Update total earnings with approved amount
+      employee.totalEarnings = parseFloat(employee.totalEarnings || 0) + parseFloat(actualAmount);
       
-      // Update pending earnings (subtract the amount that was pending)
-      employee.pendingEarnings = parseFloat(employee.pendingEarnings || 0) - parseFloat(payment.amount);
+      // Update pending earnings (subtract the originally requested amount, not approved amount)
+      employee.pendingEarnings = parseFloat(employee.pendingEarnings || 0) - parseFloat(originalRequestedAmount);
+      
+      // Ensure pending earnings doesn't go negative
+      if (employee.pendingEarnings < 0) {
+        employee.pendingEarnings = 0;
+      }
       
       // Update project earnings array
       const projectEarnings = employee.projectEarnings || [];
       projectEarnings.push({
         projectId: payment.projectId,
         projectName: payment.project.name,
-        amount: parseFloat(payment.amount),
+        amount: parseFloat(actualAmount),
+        requestedAmount: parseFloat(originalRequestedAmount),
         confirmedAt: new Date(),
         paymentId: payment.id
       });
@@ -383,21 +451,43 @@ const handleApprovePaymentRequest = async (req, res) => {
       await employee.save();
     }
 
-    // Notify employee
+    // Notify employee with payment details
+    const amountDifference = parseFloat(actualAmount) - parseFloat(originalRequestedAmount);
+    let notificationMessage = `Your payment for project "${payment.project.name}" has been processed. Amount paid: ${actualAmount} ${payment.currency}.`;
+    
+    if (amountDifference !== 0) {
+      notificationMessage += ` (Requested: ${originalRequestedAmount} ${payment.currency})`;
+    }
+
     await Notification.create({
       userId: payment.employeeId,
       title: 'Payment Processed',
-      message: `Your payment of ${payment.amount} ${payment.currency} for project "${payment.project.name}" has been processed.`,
+      message: notificationMessage,
       type: 'payment',
       relatedId: payment.id,
       relatedType: 'payment',
-      priority: 'high'
+      priority: 'high',
+      metadata: {
+        requestedAmount: originalRequestedAmount,
+        approvedAmount: actualAmount,
+        difference: amountDifference
+      }
     });
 
     res.status(200).json({
       success: true,
-      message: "Payment approved and processed successfully with transaction proof.",
-      payment
+      message: "Payment approved and processed successfully.",
+      payment: {
+        ...payment.toJSON(),
+        paymentDetails: {
+          allocatedAmount: payment.allocatedAmount,
+          requestedAmount: originalRequestedAmount,
+          approvedAmount: actualAmount,
+          actualAmount: actualAmount,
+          calculatedActualAmount: payment.calculatedActualAmount,
+          difference: amountDifference
+        }
+      }
     });
 
   } catch (error) {

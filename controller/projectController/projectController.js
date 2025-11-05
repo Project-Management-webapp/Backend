@@ -32,21 +32,16 @@ const handleCreateProject = async (req, res) => {
       // Timeline Information
       startDate,
       deadline,
-      //actualStartDate,
-      //actualEndDate,
       estimatedHours,
-      //actualHours,
       estimatedConsumables,
-      //actualConsumables,
-
       estimatedMaterials,
       rate,
-      // Status and Progress
+      // Statu
+      // s and Progress
       status,
       priority,
 
       // Financial Information
-      // budget, // Budget is auto-calculated, not accepted from user input
       allocatedAmount,
       spentAmount,
       currency,

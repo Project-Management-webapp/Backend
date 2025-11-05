@@ -8,7 +8,6 @@ const { sequelize } = require('../../mysqlConnection/dbConnection');
 
 const handleGetFinancialOverview = async (req, res) => {
   try {
-    // Get all projects regardless of status (including empty status)
     const projects = await Project.findAll({
       where: {
         [Op.or]: [
@@ -51,7 +50,7 @@ const handleGetFinancialOverview = async (req, res) => {
       const projectBudget = parseFloat(project.budget || 0);
       const allocatedAmount = parseFloat(project.allocatedAmount || 0);
       const spentAmount = parseFloat(project.spentAmount || 0);
-      const hourlyRate = parseFloat(project.rate || 0); // Dynamic rate from project
+      const hourlyRate = parseFloat(project.rate || 0); 
 
       // Calculate estimated costs (hours + consumables + materials)
       const estimatedHoursCost = parseFloat(project.estimatedHours || 0) * hourlyRate;
@@ -74,7 +73,8 @@ const handleGetFinancialOverview = async (req, res) => {
         .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
 
       const estimatedTotal = estimatedHoursCost + estimatedConsumablesCost + estimatedMaterialsCost;
-      const actualTotal = actualHoursCost + actualConsumablesCost + actualMaterialsCost + paidAmount;
+      // Actual cost should ONLY be from Project's actual fields (not include payments)
+      const actualTotal = actualHoursCost + actualConsumablesCost + actualMaterialsCost;
       
       // Profit/Loss = Budget - Actual Costs
       const profitLoss = projectBudget - actualTotal;
@@ -164,7 +164,7 @@ const handleGetFinancialOverview = async (req, res) => {
 
     // Overall calculations
     const overallProfitLoss = totalBudget - totalActualCost;
-    const overallIncome = totalBudget; // Total project budgets
+    // const overallIncome = totalBudget; // Total project budgets
     const overallExpenses = totalActualCost;
     const netIncome = overallProfitLoss;
 
@@ -182,7 +182,7 @@ const handleGetFinancialOverview = async (req, res) => {
           totalActualCost: totalActualCost,
           overallProfitLoss: overallProfitLoss,
           overallProfitLossPercentage: totalBudget > 0 ? ((overallProfitLoss / totalBudget) * 100).toFixed(2) : 0,
-          overallIncome: overallIncome,
+          // overallIncome: overallIncome,
           overallExpenses: overallExpenses,
           netIncome: netIncome,
           remainingBudget: totalBudget - totalAllocatedToEmployees
@@ -251,16 +251,10 @@ const handleGetProjectProfitLoss = async (req, res) => {
     const estimatedConsumablesCost = parseFloat(project.estimatedConsumables || 0);
     const estimatedMaterialsCost = parseFloat(project.estimatedMaterials || 0);
 
-    // Calculate actual values from sum of all assignments
-    let actualHours = 0;
-    let actualConsumablesCost = 0;
-    let actualMaterialsCost = 0;
-
-    assignments.forEach(assignment => {
-      actualHours += parseFloat(assignment.actualHours || 0);
-      actualConsumablesCost += parseFloat(assignment.actualConsumables || 0);
-      actualMaterialsCost += parseFloat(assignment.actualMaterials || 0);
-    });
+    // Calculate actual values from project's own fields (not from assignments)
+    const actualHours = parseFloat(project.actualHours || 0);
+    const actualConsumablesCost = parseFloat(project.actualConsumables || 0);
+    const actualMaterialsCost = parseFloat(project.actualMaterials || 0);
 
     const estimatedHoursCost = estimatedHours * hourlyRate;
     const actualHoursCost = actualHours * hourlyRate;
@@ -273,59 +267,21 @@ const handleGetProjectProfitLoss = async (req, res) => {
       .filter(p => p.requestStatus === 'requested')
       .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
 
-    // Total costs (matching project creation formula)
+    // Total costs
+    // Estimated: based on project's estimated fields
     const estimatedTotalCost = estimatedHoursCost + estimatedConsumablesCost + estimatedMaterialsCost;
-    const actualTotalCost = actualHoursCost + actualConsumablesCost + actualMaterialsCost + paidToEmployees;
-    const projectedTotalCost = actualHoursCost + actualConsumablesCost + actualMaterialsCost + paidToEmployees + pendingPayments;
+    
+    // Actual: ONLY from project's actual fields (actualHours * rate + actualConsumables + actualMaterials)
+    // Do NOT include payments or assignment data
+    const actualTotalCost = actualHoursCost + actualConsumablesCost + actualMaterialsCost;
+    
+    // Projected: actual costs + pending payments
+    const projectedTotalCost = actualTotalCost + pendingPayments;
 
     // Profit/Loss calculations
     const currentProfitLoss = budget - actualTotalCost;
     const projectedProfitLoss = budget - projectedTotalCost;
     const estimatedProfitLoss = budget - estimatedTotalCost;
-
-    // Calculate assignment-level tracking
-    const assignmentTracking = assignments.map(assignment => {
-      const assignmentPayments = payments.filter(p => p.assignmentId === assignment.id);
-      const assignmentPaid = assignmentPayments
-        .filter(p => p.requestStatus === 'paid')
-        .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-      const assignmentPending = assignmentPayments
-        .filter(p => p.requestStatus === 'requested')
-        .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-
-      const estHours = parseFloat(assignment.estimatedHours || 0);
-      const actHours = parseFloat(assignment.actualHours || 0);
-      const estConsumables = parseFloat(assignment.estimatedConsumables || 0);
-      const actConsumables = parseFloat(assignment.actualConsumables || 0);
-      const estMaterials = parseFloat(assignment.estimatedMaterials || 0);
-      const actMaterials = parseFloat(assignment.actualMaterials || 0);
-
-      return {
-        assignmentId: assignment.id,
-        employee: assignment.employee,
-        role: assignment.role,
-        workStatus: assignment.workStatus,
-        tracking: {
-          estimatedHours: estHours,
-          actualHours: actHours,
-          hoursVariance: actHours - estHours,
-          hoursUtilization: estHours > 0 ? ((actHours / estHours) * 100).toFixed(2) : 0
-        },
-        costs: {
-          allocated: parseFloat(assignment.allocatedAmount || 0),
-          paid: assignmentPaid,
-          pending: assignmentPending,
-          estimatedConsumables: estConsumables,
-          actualConsumables: actConsumables,
-          estimatedMaterials: estMaterials,
-          actualMaterials: actMaterials
-        },
-        variance: {
-          consumables: actConsumables - estConsumables,
-          materials: actMaterials - estMaterials
-        }
-      };
-    });
 
     res.status(200).json({
       success: true,
@@ -431,8 +387,7 @@ const handleGetProjectProfitLoss = async (req, res) => {
           totalPayments: payments.length,
           paidPayments: payments.filter(p => p.requestStatus === 'paid').length,
           pendingPayments: payments.filter(p => p.requestStatus === 'requested').length
-        },
-        assignmentTracking: assignmentTracking
+        }
       }
     });
 
@@ -475,7 +430,18 @@ const handleGetIncomeSummary = async (req, res) => {
     });
 
     const projectIds = projects.map(p => p.id);
+    
+    // Get all payments for these projects
     const payments = await Payment.findAll({
+      where: {
+        projectId: {
+          [Op.in]: projectIds
+        }
+      }
+    });
+
+    // Get all assignments for these projects
+    const assignments = await ProjectAssignment.findAll({
       where: {
         projectId: {
           [Op.in]: projectIds
@@ -496,21 +462,34 @@ const handleGetIncomeSummary = async (req, res) => {
     let totalRevenue = 0;
     let totalCosts = 0;
     let totalProfit = 0;
+    let totalAllocatedAmount = 0;
+    let totalActualAmount = 0;
 
     for (const project of projects) {
       const budget = parseFloat(project.budget || 0);
-      const actualHoursCost = parseFloat(project.actualHours || 0) * 50;
-      const actualConsumablesCost = Array.isArray(project.actualConsumables)
-        ? project.actualConsumables.reduce((sum, item) => sum + parseFloat(item.cost || 0), 0)
-        : 0;
-      const actualMaterialsCost = Array.isArray(project.actualMaterials)
-        ? project.actualMaterials.reduce((sum, item) => sum + parseFloat(item.cost || 0), 0)
-        : 0;
+      const hourlyRate = parseFloat(project.rate || 0);
       
+      // Get actual hours, consumables, and materials from project
+      const actualHoursCost = parseFloat(project.actualHours || 0) * hourlyRate;
+      const actualConsumablesCost = parseFloat(project.actualConsumables || 0);
+      const actualMaterialsCost = parseFloat(project.actualMaterials || 0);
+      
+      // Get payments for this project
       const projectPayments = payments.filter(p => p.projectId === project.id);
       const paidAmount = projectPayments
         .filter(p => p.requestStatus === 'paid')
         .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+
+      // Get assignments data for this project
+      const projectAssignments = assignments.filter(a => a.projectId === project.id);
+      const allocatedAmount = projectAssignments.reduce((sum, a) => sum + parseFloat(a.allocatedAmount || 0), 0);
+      const actualAmount = projectAssignments.reduce((sum, a) => {
+        const hours = parseFloat(a.actualHours || 0);
+        const rate = parseFloat(a.rate || 0);
+        const consumables = parseFloat(a.actualConsumables || 0);
+        const materials = parseFloat(a.actualMaterials || 0);
+        return sum + (hours * rate) + consumables + materials;
+      }, 0);
 
       const totalCost = actualHoursCost + actualConsumablesCost + actualMaterialsCost + paidAmount;
       const profit = budget - totalCost;
@@ -522,13 +501,17 @@ const handleGetIncomeSummary = async (req, res) => {
           count: 0,
           totalRevenue: 0,
           totalCosts: 0,
-          totalProfit: 0
+          totalProfit: 0,
+          totalAllocated: 0,
+          totalActual: 0
         };
       }
       incomeByType[type].count++;
       incomeByType[type].totalRevenue += budget;
       incomeByType[type].totalCosts += totalCost;
       incomeByType[type].totalProfit += profit;
+      incomeByType[type].totalAllocated += allocatedAmount;
+      incomeByType[type].totalActual += actualAmount;
 
       // By status
       if (incomeByStatus.hasOwnProperty(project.status)) {
@@ -538,6 +521,8 @@ const handleGetIncomeSummary = async (req, res) => {
       totalRevenue += budget;
       totalCosts += totalCost;
       totalProfit += profit;
+      totalAllocatedAmount += allocatedAmount;
+      totalActualAmount += actualAmount;
     }
 
     // Calculate monthly breakdown if date range provided
@@ -552,7 +537,9 @@ const handleGetIncomeSummary = async (req, res) => {
             revenue: 0,
             costs: 0,
             profit: 0,
-            projectCount: 0
+            projectCount: 0,
+            allocatedAmount: 0,
+            actualAmount: 0
           };
         }
         
@@ -560,10 +547,23 @@ const handleGetIncomeSummary = async (req, res) => {
         const projectPayments = payments.filter(p => p.projectId === project.id && p.requestStatus === 'paid');
         const costs = projectPayments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
         
+        // Get assignment amounts for this project
+        const projectAssignments = assignments.filter(a => a.projectId === project.id);
+        const allocatedAmount = projectAssignments.reduce((sum, a) => sum + parseFloat(a.allocatedAmount || 0), 0);
+        const actualAmount = projectAssignments.reduce((sum, a) => {
+          const hours = parseFloat(a.actualHours || 0);
+          const rate = parseFloat(a.rate || 0);
+          const consumables = parseFloat(a.actualConsumables || 0);
+          const materials = parseFloat(a.actualMaterials || 0);
+          return sum + (hours * rate) + consumables + materials;
+        }, 0);
+        
         months[month].revenue += budget;
         months[month].costs += costs;
         months[month].profit += (budget - costs);
         months[month].projectCount++;
+        months[month].allocatedAmount += allocatedAmount;
+        months[month].actualAmount += actualAmount;
       }
       monthlyBreakdown = Object.values(months).sort((a, b) => a.month.localeCompare(b.month));
     }
@@ -578,7 +578,9 @@ const handleGetIncomeSummary = async (req, res) => {
           totalCosts: totalCosts,
           totalProfit: totalProfit,
           profitMargin: totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(2) : 0,
-          averageProjectBudget: projects.length > 0 ? (totalRevenue / projects.length).toFixed(2) : 0
+          averageProjectBudget: projects.length > 0 ? (totalRevenue / projects.length).toFixed(2) : 0,
+          totalAllocatedAmount: totalAllocatedAmount,
+          totalActualAmount: totalActualAmount
         },
         byProjectType: incomeByType,
         byStatus: incomeByStatus,
@@ -629,7 +631,7 @@ const handleGetEmployeeAllocations = async (req, res) => {
         {
           model: Project,
           as: 'project',
-          attributes: ['id', 'name', 'status', 'budget']
+          attributes: ['id', 'name', 'status', 'budget', 'rate', 'estimatedHours', 'actualHours', 'estimatedConsumables', 'actualConsumables', 'estimatedMaterials', 'actualMaterials']
         }
       ]
     });
@@ -667,21 +669,37 @@ const handleGetEmployeeAllocations = async (req, res) => {
         .filter(p => p.requestStatus === 'requested')
         .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
 
-      // Calculate tracking metrics
+      // Assignment-level tracking metrics
       const estHours = parseFloat(assignment.estimatedHours || 0);
       const actHours = parseFloat(assignment.actualHours || 0);
-      const estConsumables = Array.isArray(assignment.estimatedConsumables)
-        ? assignment.estimatedConsumables.reduce((sum, item) => sum + parseFloat(item.cost || 0), 0)
-        : 0;
-      const actConsumables = Array.isArray(assignment.actualConsumables)
-        ? assignment.actualConsumables.reduce((sum, item) => sum + parseFloat(item.cost || 0), 0)
-        : 0;
-      const estMaterials = Array.isArray(assignment.estimatedMaterials)
-        ? assignment.estimatedMaterials.reduce((sum, item) => sum + parseFloat(item.cost || 0), 0)
-        : 0;
-      const actMaterials = Array.isArray(assignment.actualMaterials)
-        ? assignment.actualMaterials.reduce((sum, item) => sum + parseFloat(item.cost || 0), 0)
-        : 0;
+      const assignmentRate = parseFloat(assignment.rate || 0);
+      
+      // Assignment-level costs (DECIMAL fields)
+      const estConsumables = parseFloat(assignment.estimatedConsumables || 0);
+      const actConsumables = parseFloat(assignment.actualConsumables || 0);
+      const estMaterials = parseFloat(assignment.estimatedMaterials || 0);
+      const actMaterials = parseFloat(assignment.actualMaterials || 0);
+
+      // Calculate assignment-level total costs
+      const assignmentEstimatedHoursCost = estHours * assignmentRate;
+      const assignmentActualHoursCost = actHours * assignmentRate;
+      const assignmentEstimatedTotalCost = assignmentEstimatedHoursCost + estConsumables + estMaterials;
+      const assignmentActualTotalCost = assignmentActualHoursCost + actConsumables + actMaterials;
+
+      // Project-level tracking metrics
+      const projectRate = parseFloat(assignment.project.rate || 0);
+      const projectEstHours = parseFloat(assignment.project.estimatedHours || 0);
+      const projectActHours = parseFloat(assignment.project.actualHours || 0);
+      const projectEstConsumables = parseFloat(assignment.project.estimatedConsumables || 0);
+      const projectActConsumables = parseFloat(assignment.project.actualConsumables || 0);
+      const projectEstMaterials = parseFloat(assignment.project.estimatedMaterials || 0);
+      const projectActMaterials = parseFloat(assignment.project.actualMaterials || 0);
+
+      // Calculate project-level total costs
+      const projectEstimatedHoursCost = projectEstHours * projectRate;
+      const projectActualHoursCost = projectActHours * projectRate;
+      const projectEstimatedTotalCost = projectEstimatedHoursCost + projectEstConsumables + projectEstMaterials;
+      const projectActualTotalCost = projectActualHoursCost + projectActConsumables + projectActMaterials;
 
       employeeAllocations[empId].totalAllocated += allocated;
       employeeAllocations[empId].totalPaid += paid;
@@ -690,30 +708,78 @@ const handleGetEmployeeAllocations = async (req, res) => {
         projectId: assignment.project.id,
         projectName: assignment.project.name,
         projectStatus: assignment.project.status,
+        projectBudget: parseFloat(assignment.project.budget || 0),
         role: assignment.role,
         allocated: allocated,
         paid: paid,
         pending: pending,
         workStatus: assignment.workStatus,
-        tracking: {
+        assignmentLevel: {
           estimatedHours: estHours,
           actualHours: actHours,
+          rate: assignmentRate,
           hoursVariance: actHours - estHours,
           hoursUtilization: estHours > 0 ? ((actHours / estHours) * 100).toFixed(2) : 0,
-          consumables: {
-            estimated: estConsumables,
-            actual: actConsumables,
-            variance: actConsumables - estConsumables
+          costs: {
+            estimated: {
+              hours: assignmentEstimatedHoursCost,
+              consumables: estConsumables,
+              materials: estMaterials,
+              total: assignmentEstimatedTotalCost
+            },
+            actual: {
+              hours: assignmentActualHoursCost,
+              consumables: actConsumables,
+              materials: actMaterials,
+              total: assignmentActualTotalCost
+            }
           },
-          materials: {
-            estimated: estMaterials,
-            actual: actMaterials,
-            variance: actMaterials - estMaterials
+          variance: {
+            hours: actHours - estHours,
+            hoursPercentage: estHours > 0 ? (((actHours - estHours) / estHours) * 100).toFixed(2) : 0,
+            consumables: actConsumables - estConsumables,
+            consumablesPercentage: estConsumables > 0 ? (((actConsumables - estConsumables) / estConsumables) * 100).toFixed(2) : 0,
+            materials: actMaterials - estMaterials,
+            materialsPercentage: estMaterials > 0 ? (((actMaterials - estMaterials) / estMaterials) * 100).toFixed(2) : 0,
+            totalCost: assignmentActualTotalCost - assignmentEstimatedTotalCost,
+            totalCostPercentage: assignmentEstimatedTotalCost > 0 ? (((assignmentActualTotalCost - assignmentEstimatedTotalCost) / assignmentEstimatedTotalCost) * 100).toFixed(2) : 0
+          }
+        },
+        projectLevel: {
+          estimatedHours: projectEstHours,
+          actualHours: projectActHours,
+          rate: projectRate,
+          hoursVariance: projectActHours - projectEstHours,
+          hoursUtilization: projectEstHours > 0 ? ((projectActHours / projectEstHours) * 100).toFixed(2) : 0,
+          costs: {
+            estimated: {
+              hours: projectEstimatedHoursCost,
+              consumables: projectEstConsumables,
+              materials: projectEstMaterials,
+              total: projectEstimatedTotalCost
+            },
+            actual: {
+              hours: projectActualHoursCost,
+              consumables: projectActConsumables,
+              materials: projectActMaterials,
+              total: projectActualTotalCost
+            }
+          },
+          variance: {
+            hours: projectActHours - projectEstHours,
+            hoursPercentage: projectEstHours > 0 ? (((projectActHours - projectEstHours) / projectEstHours) * 100).toFixed(2) : 0,
+            consumables: projectActConsumables - projectEstConsumables,
+            consumablesPercentage: projectEstConsumables > 0 ? (((projectActConsumables - projectEstConsumables) / projectEstConsumables) * 100).toFixed(2) : 0,
+            materials: projectActMaterials - projectEstMaterials,
+            materialsPercentage: projectEstMaterials > 0 ? (((projectActMaterials - projectEstMaterials) / projectEstMaterials) * 100).toFixed(2) : 0,
+            totalCost: projectActualTotalCost - projectEstimatedTotalCost,
+            totalCostPercentage: projectEstimatedTotalCost > 0 ? (((projectActualTotalCost - projectEstimatedTotalCost) / projectEstimatedTotalCost) * 100).toFixed(2) : 0
           }
         },
         performance: {
           completionRate: allocated > 0 ? ((paid / allocated) * 100).toFixed(2) : 0,
-          efficiency: estHours > 0 && actHours > 0 ? ((estHours / actHours) * 100).toFixed(2) : 0
+          efficiency: estHours > 0 && actHours > 0 ? ((estHours / actHours) * 100).toFixed(2) : 0,
+          costEfficiency: assignmentEstimatedTotalCost > 0 && assignmentActualTotalCost > 0 ? ((assignmentEstimatedTotalCost / assignmentActualTotalCost) * 100).toFixed(2) : 0
         }
       });
     }
@@ -750,15 +816,21 @@ const handleGetEmployeeAllocations = async (req, res) => {
   }
 };
 
-/**
- * Get detailed resource comparison and tracking
- */
+
 const handleGetResourceComparison = async (req, res) => {
   try {
+    
     const { projectId } = req.params;
     
     const project = await Project.findOne({
-      where: { id: projectId }
+      where: { id: projectId },
+      attributes: [
+        'id', 'name', 'status', 'budget', 
+        'estimatedHours', 'actualHours',
+        'estimatedConsumables', 'actualConsumables',
+        'estimatedMaterials', 'actualMaterials',
+        'rate'
+      ]
     });
 
     if (!project) {
@@ -767,8 +839,8 @@ const handleGetResourceComparison = async (req, res) => {
         message: "Project not found"
       });
     }
-
-    // Get all assignments for detailed breakdown
+    
+    
     const assignments = await ProjectAssignment.findAll({
       where: { projectId },
       include: [{
@@ -778,24 +850,20 @@ const handleGetResourceComparison = async (req, res) => {
       }]
     });
 
-    // Calculate actual values from sum of all assignments (dynamic)
-    let projectActualHours = 0;
-    let projectActualConsumablesCost = 0;
-    let projectActualMaterialsCost = 0;
-
-    assignments.forEach(assignment => {
-      projectActualHours += parseFloat(assignment.actualHours || 0);
-      projectActualConsumablesCost += parseFloat(assignment.actualConsumables || 0);
-      projectActualMaterialsCost += parseFloat(assignment.actualMaterials || 0);
-    });
-
-    // Get estimated values from project model
+    // Get values from PROJECT MODEL ONLY (Manager updates these via handleUpdateProject)
     const projectEstimatedHours = parseFloat(project.estimatedHours || 0);
+    const projectActualHours = parseFloat(project.actualHours || 0);
     const projectEstimatedConsumablesCost = parseFloat(project.estimatedConsumables || 0);
+    const projectActualConsumablesCost = parseFloat(project.actualConsumables || 0);
     const projectEstimatedMaterialsCost = parseFloat(project.estimatedMaterials || 0);
+    const projectActualMaterialsCost = parseFloat(project.actualMaterials || 0);
     const hourlyRate = parseFloat(project.rate || 0);
 
-    // Project-level tracking (all dynamic)
+    // Calculate costs from PROJECT fields
+    const projectEstimatedHoursCost = projectEstimatedHours * hourlyRate;
+    const projectActualHoursCost = projectActualHours * hourlyRate;
+
+    // Project-level tracking (from PROJECT model)
     const projectTracking = {
       hours: {
         estimated: projectEstimatedHours,
@@ -806,8 +874,8 @@ const handleGetResourceComparison = async (req, res) => {
           : 0,
         status: projectActualHours > projectEstimatedHours ? 'over' : projectActualHours < projectEstimatedHours ? 'under' : 'on-track',
         rate: hourlyRate,
-        estimatedCost: projectEstimatedHours * hourlyRate,
-        actualCost: projectActualHours * hourlyRate
+        estimatedCost: projectEstimatedHoursCost,
+        actualCost: projectActualHoursCost
       },
       consumables: {
         estimatedCost: projectEstimatedConsumablesCost,
@@ -829,7 +897,7 @@ const handleGetResourceComparison = async (req, res) => {
       }
     };
 
-    // Assignment-level tracking (dynamic)
+    // Assignment-level tracking (for individual employee breakdown only)
     const assignmentTracking = assignments.map(assignment => {
       const estHours = parseFloat(assignment.estimatedHours || 0);
       const actHours = parseFloat(assignment.actualHours || 0);
@@ -870,23 +938,14 @@ const handleGetResourceComparison = async (req, res) => {
           variancePercentage: estMaterialsCost > 0 ? (((actMaterialsCost - estMaterialsCost) / estMaterialsCost) * 100).toFixed(2) : 0,
           status: actMaterialsCost > estMaterialsCost ? 'over' : actMaterialsCost < estMaterialsCost ? 'under' : 'on-track'
         },
-        totalAllocation: parseFloat(assignment.allocatedAmount || 0)
+        totalAllocation: parseFloat(assignment.allocatedAmount || 0),
+        actualAmount: parseFloat(assignment.actualAmount || 0) // Amount updated by manager during payment approval
       };
     });
 
-    // Calculate summary statistics from assignments (dynamic aggregation)
-    const totalEstimatedHours = assignmentTracking.reduce((sum, a) => sum + a.hours.estimated, 0);
-    const totalActualHours = assignmentTracking.reduce((sum, a) => sum + a.hours.actual, 0);
-    const totalEstimatedConsumables = assignmentTracking.reduce((sum, a) => sum + a.consumables.estimatedCost, 0);
-    const totalActualConsumables = assignmentTracking.reduce((sum, a) => sum + a.consumables.actualCost, 0);
-    const totalEstimatedMaterials = assignmentTracking.reduce((sum, a) => sum + a.materials.estimatedCost, 0);
-    const totalActualMaterials = assignmentTracking.reduce((sum, a) => sum + a.materials.actualCost, 0);
-    const totalEstimatedHoursCost = assignmentTracking.reduce((sum, a) => sum + a.hours.estimatedCost, 0);
-    const totalActualHoursCost = assignmentTracking.reduce((sum, a) => sum + a.hours.actualCost, 0);
-
-    // Calculate total costs
-    const totalEstimatedCost = totalEstimatedHoursCost + totalEstimatedConsumables + totalEstimatedMaterials;
-    const totalActualCost = totalActualHoursCost + totalActualConsumables + totalActualMaterials;
+    // Calculate total costs from PROJECT fields (not from assignments)
+    const totalEstimatedCost = projectEstimatedHoursCost + projectEstimatedConsumablesCost + projectEstimatedMaterialsCost;
+    const totalActualCost = projectActualHoursCost + projectActualConsumablesCost + projectActualMaterialsCost;
 
     res.status(200).json({
       success: true,
@@ -902,25 +961,26 @@ const handleGetResourceComparison = async (req, res) => {
         assignmentLevel: {
           summary: {
             totalAssignments: assignments.length,
-            totalEstimatedHours,
-            totalActualHours,
-            hoursVariance: totalActualHours - totalEstimatedHours,
-            hoursVariancePercentage: totalEstimatedHours > 0 
-              ? (((totalActualHours - totalEstimatedHours) / totalEstimatedHours) * 100).toFixed(2)
+            // Note: These are from PROJECT level, not aggregated from assignments
+            totalEstimatedHours: projectEstimatedHours,
+            totalActualHours: projectActualHours,
+            hoursVariance: projectActualHours - projectEstimatedHours,
+            hoursVariancePercentage: projectEstimatedHours > 0 
+              ? (((projectActualHours - projectEstimatedHours) / projectEstimatedHours) * 100).toFixed(2)
               : 0,
-            totalEstimatedHoursCost,
-            totalActualHoursCost,
-            totalEstimatedConsumables,
-            totalActualConsumables,
-            consumablesVariance: totalActualConsumables - totalEstimatedConsumables,
-            consumablesVariancePercentage: totalEstimatedConsumables > 0 
-              ? (((totalActualConsumables - totalEstimatedConsumables) / totalEstimatedConsumables) * 100).toFixed(2)
+            totalEstimatedHoursCost: projectEstimatedHoursCost,
+            totalActualHoursCost: projectActualHoursCost,
+            totalEstimatedConsumables: projectEstimatedConsumablesCost,
+            totalActualConsumables: projectActualConsumablesCost,
+            consumablesVariance: projectActualConsumablesCost - projectEstimatedConsumablesCost,
+            consumablesVariancePercentage: projectEstimatedConsumablesCost > 0 
+              ? (((projectActualConsumablesCost - projectEstimatedConsumablesCost) / projectEstimatedConsumablesCost) * 100).toFixed(2)
               : 0,
-            totalEstimatedMaterials,
-            totalActualMaterials,
-            materialsVariance: totalActualMaterials - totalEstimatedMaterials,
-            materialsVariancePercentage: totalEstimatedMaterials > 0 
-              ? (((totalActualMaterials - totalEstimatedMaterials) / totalEstimatedMaterials) * 100).toFixed(2)
+            totalEstimatedMaterials: projectEstimatedMaterialsCost,
+            totalActualMaterials: projectActualMaterialsCost,
+            materialsVariance: projectActualMaterialsCost - projectEstimatedMaterialsCost,
+            materialsVariancePercentage: projectEstimatedMaterialsCost > 0 
+              ? (((projectActualMaterialsCost - projectEstimatedMaterialsCost) / projectEstimatedMaterialsCost) * 100).toFixed(2)
               : 0,
             totalEstimatedCost,
             totalActualCost,
@@ -932,14 +992,15 @@ const handleGetResourceComparison = async (req, res) => {
           assignments: assignmentTracking
         },
         performanceIndicators: {
-          overallEfficiency: totalEstimatedHours > 0 && totalActualHours > 0 
-            ? ((totalEstimatedHours / totalActualHours) * 100).toFixed(2) 
+          // All based on PROJECT level data
+          overallEfficiency: projectEstimatedHours > 0 && projectActualHours > 0 
+            ? ((projectEstimatedHours / projectActualHours) * 100).toFixed(2) 
             : 0,
-          consumablesAccuracy: totalEstimatedConsumables > 0 
-            ? (100 - Math.abs(((totalActualConsumables - totalEstimatedConsumables) / totalEstimatedConsumables) * 100)).toFixed(2)
+          consumablesAccuracy: projectEstimatedConsumablesCost > 0 
+            ? (100 - Math.abs(((projectActualConsumablesCost - projectEstimatedConsumablesCost) / projectEstimatedConsumablesCost) * 100)).toFixed(2)
             : 0,
-          materialsAccuracy: totalEstimatedMaterials > 0 
-            ? (100 - Math.abs(((totalActualMaterials - totalEstimatedMaterials) / totalEstimatedMaterials) * 100)).toFixed(2)
+          materialsAccuracy: projectEstimatedMaterialsCost > 0 
+            ? (100 - Math.abs(((projectActualMaterialsCost - projectEstimatedMaterialsCost) / projectEstimatedMaterialsCost) * 100)).toFixed(2)
             : 0,
           costPerformanceIndex: totalEstimatedCost > 0 && totalActualCost > 0 
             ? (totalEstimatedCost / totalActualCost).toFixed(2)
