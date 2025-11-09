@@ -74,6 +74,7 @@ const managerStatsRoutes = require("./routes/statsRoute/managerStatsRoute");
 const managerFinanceRoutes = require("./routes/financeRoute/managerFinanceRoute");
 const { checkForAuthenticationCookie } = require("./middleware/authMiddleware");
 const gemniRoutes = require("./routes/aiRoute/gemniRoute");
+const videoCallRoutes = require("./routes/videoCallRoute/videoCallRoute");
 
 app.use("/api/auth", employeeAuthRoutes, managerAuthRoutes, commonAuthRoutes);
 
@@ -181,6 +182,12 @@ app.use(
   gemniRoutes
 );
 
+// Video Call Routes
+app.use(
+  "/api/video-call",
+  checkForAuthenticationCookie("token"),
+  videoCallRoutes
+);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -278,6 +285,93 @@ io.on('connection', (socket) => {
     const isOnline = onlineUsers.has(userId);
     callback({ userId, status: isOnline ? 'online' : 'offline' });
   });
+
+  // ========== VIDEO CALL EVENTS ==========
+  
+  // Start video call - notify all project participants
+  socket.on('start_video_call', ({ projectId, callerId, callerName, projectName }) => {
+    const projectIdStr = String(projectId);
+    const roomName = `project_${projectIdStr}`;
+    console.log(`📹 ${callerName} started video call in ${roomName}`);
+    
+    // Notify all participants in the project room
+    socket.to(roomName).emit('incoming_video_call', {
+      projectId: projectIdStr,
+      callerId,
+      callerName,
+      projectName,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // Join video call room
+  socket.on('join_video_call', ({ projectId, userId, userName }) => {
+    const projectIdStr = String(projectId);
+    const videoRoomName = `video_${projectIdStr}`;
+    socket.join(videoRoomName);
+    console.log(`🎥 ${userName} (${userId}) joined video call: ${videoRoomName}`);
+    
+    // Notify others in the video call that someone joined
+    socket.to(videoRoomName).emit('user_joined_video_call', {
+      userId,
+      userName,
+      socketId: socket.id
+    });
+  });
+
+  // WebRTC Signaling: Offer
+  socket.on('webrtc_offer', ({ offer, to, from, fromName }) => {
+    console.log(`📡 WebRTC offer from ${fromName} (${from}) to ${to}`);
+    io.to(to).emit('webrtc_offer', { offer, from, fromName });
+  });
+
+  // WebRTC Signaling: Answer
+  socket.on('webrtc_answer', ({ answer, to, from }) => {
+    console.log(`📡 WebRTC answer from ${from} to ${to}`);
+    io.to(to).emit('webrtc_answer', { answer, from });
+  });
+
+  // WebRTC Signaling: ICE Candidate
+  socket.on('webrtc_ice_candidate', ({ candidate, to, from }) => {
+    console.log(`🧊 ICE candidate from ${from} to ${to}`);
+    io.to(to).emit('webrtc_ice_candidate', { candidate, from });
+  });
+
+  // Leave video call
+  socket.on('leave_video_call', ({ projectId, userId, userName }) => {
+    const projectIdStr = String(projectId);
+    const videoRoomName = `video_${projectIdStr}`;
+    socket.leave(videoRoomName);
+    console.log(`👋 ${userName} left video call: ${videoRoomName}`);
+    
+    // Notify others that user left
+    socket.to(videoRoomName).emit('user_left_video_call', { userId, userName });
+  });
+
+  // End video call - notify all participants
+  socket.on('end_video_call', ({ projectId, userId, userName }) => {
+    const projectIdStr = String(projectId);
+    const videoRoomName = `video_${projectIdStr}`;
+    console.log(`🔴 ${userName} ended video call: ${videoRoomName}`);
+    
+    // Notify all participants that call has ended
+    io.to(videoRoomName).emit('video_call_ended', { userId, userName });
+  });
+
+  // Toggle video/audio
+  socket.on('toggle_media', ({ projectId, userId, mediaType, enabled }) => {
+    const projectIdStr = String(projectId);
+    const videoRoomName = `video_${projectIdStr}`;
+    
+    // Notify others about media state change
+    socket.to(videoRoomName).emit('user_media_changed', {
+      userId,
+      mediaType, // 'video' or 'audio'
+      enabled
+    });
+  });
+
+  // ========== END VIDEO CALL EVENTS ==========
 });
 
 initDB(() => {
