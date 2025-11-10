@@ -411,18 +411,25 @@ const handleUpdateProject = async (req, res) => {
     if (actualStartDate !== undefined)
       updateData.actualStartDate = actualStartDate;
     if (actualEndDate !== undefined) updateData.actualEndDate = actualEndDate;
+    
+    // Estimated fields (for budget calculation)
     if (estimatedHours !== undefined)
       updateData.estimatedHours = estimatedHours;
-    if (actualHours !== undefined) updateData.actualHours = actualHours;
     if (estimatedConsumables !== undefined)
       updateData.estimatedConsumables = estimatedConsumables;
-    if (actualConsumables !== undefined)
-      updateData.actualConsumables = actualConsumables;
     if (estimatedMaterials !== undefined)
       updateData.estimatedMaterials = estimatedMaterials;
+    if (rate !== undefined) updateData.rate = rate;
+    
+    // Actual fields (MANAGER SETS THESE MANUALLY - used for financial reports)
+    // These values are used in Profit/Loss and Financial Overview calculations
+    // They should reflect the manager's assessment of actual project costs
+    // NOT aggregated from employee assignments
+    if (actualHours !== undefined) updateData.actualHours = actualHours;
+    if (actualConsumables !== undefined)
+      updateData.actualConsumables = actualConsumables;
     if (actualMaterials !== undefined)
       updateData.actualMaterials = actualMaterials;
-    if (rate !== undefined) updateData.rate = rate;
 
     // Auto-calculate budget if any of the budget-related fields are updated
     const shouldRecalculateBudget =
@@ -592,6 +599,17 @@ const handleGetMyProjects = async (req, res) => {
 
 /**
  * Mark project as completed
+ * 
+ * IMPORTANT: This function only updates the status to "completed" and sets actualEndDate.
+ * It does NOT modify actualHours, actualConsumables, or actualMaterials.
+ * 
+ * Manager should update these actual values via handleUpdateProject BEFORE marking as completed.
+ * 
+ * Flow:
+ * 1. Employees submit work with their individual actuals (in ProjectAssignment)
+ * 2. Manager reviews and updates Project.actualHours/actualConsumables/actualMaterials manually
+ * 3. Manager marks project as completed (this function)
+ * 4. Financial reports use the Project's actual fields (manager's values)
  */
 const handleMarkProjectAsCompleted = async (req, res) => {
   try {
@@ -617,32 +635,12 @@ const handleMarkProjectAsCompleted = async (req, res) => {
       });
     }
 
-    // Get all project assignments to calculate actual totals
-    const assignments = await ProjectAssignment.findAll({
-      where: { 
-        projectId: projectId,
-        isActive: true
-      }
-    });
-
-    // Calculate total actual hours, materials, and consumables from all assignments
-    let totalActualHours = 0;
-    let totalActualMaterials = 0;
-    let totalActualConsumables = 0;
-
-    assignments.forEach(assignment => {
-      totalActualHours += parseFloat(assignment.actualHours) || 0;
-      totalActualMaterials += parseFloat(assignment.actualMaterials) || 0;
-      totalActualConsumables += parseFloat(assignment.actualConsumables) || 0;
-    });
-
-    // Update project status to completed and set actual values
+    // Update project status to completed and set actualEndDate
+    // PRESERVE manager's manually set actual values (actualHours, actualConsumables, actualMaterials)
+    // These values are used for financial calculations (Profit/Loss, Financial Overview)
     await project.update({
       status: "completed",
       actualEndDate: new Date(),
-      actualHours: totalActualHours,
-      actualMaterials: totalActualMaterials,
-      actualConsumables: totalActualConsumables,
     });
 
     // // Optionally, you can also update all project assignments to completed
@@ -656,9 +654,19 @@ const handleMarkProjectAsCompleted = async (req, res) => {
     //   }
     // );
 
+    // Check if actual values are set (warn if not)
+    const hasActualValues = project.actualHours > 0 || 
+                           project.actualConsumables > 0 || 
+                           project.actualMaterials > 0;
+
+    const responseMessage = hasActualValues
+      ? "Project marked as completed successfully"
+      : "Project marked as completed. Note: Actual values (hours, consumables, materials) are not set. Financial reports will show zero costs.";
+
     return res.status(200).json({
       success: true,
-      message: "Project marked as completed successfully",
+      message: responseMessage,
+      warning: !hasActualValues ? "Update project actual values for accurate financial reports" : null,
       data: {
         projectId: project.id,
         projectName: project.name,
