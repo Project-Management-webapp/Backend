@@ -75,6 +75,7 @@ const managerFinanceRoutes = require("./routes/financeRoute/managerFinanceRoute"
 const { checkForAuthenticationCookie } = require("./middleware/authMiddleware");
 const gemniRoutes = require("./routes/aiRoute/gemniRoute");
 const videoCallRoutes = require("./routes/videoCallRoute/videoCallRoute");
+const twoFactorRoutes = require("./routes/twoFactorRoute/twoFactorRoute");
 
 app.use("/api/auth", employeeAuthRoutes, managerAuthRoutes, commonAuthRoutes);
 
@@ -188,6 +189,9 @@ app.use(
   checkForAuthenticationCookie("token"),
   videoCallRoutes
 );
+
+// Two-Factor Authentication Routes
+app.use("/api/2fa", twoFactorRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });

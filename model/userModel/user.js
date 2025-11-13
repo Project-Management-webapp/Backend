@@ -249,6 +249,17 @@ const User = sequelize.define('User', {
     allowNull: true,
   },
   
+  // Two-Factor Authentication
+  twoFactorEnabled: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    allowNull: false,
+  },
+  twoFactorSecret: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+  },
+  
   // Leave and Time Off
   totalLeaveBalance: {
     type: DataTypes.INTEGER,

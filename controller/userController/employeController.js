@@ -101,6 +101,21 @@ const handleEmployeeLogin = async (req, res) => {
       });
     }
 
+    // Check if 2FA is enabled
+    if (user.twoFactorEnabled) {
+      // Return success but indicate 2FA is required
+      return res.status(200).json({
+        success: true,
+        require2FA: true,
+        message: "2FA verification required",
+        data: {
+          userId: user.id,
+          email: user.email,
+          fullName: user.fullName
+        }
+      });
+    }
+
     // Reset login attempts on successful login
     await user.update({
       loginAttempts: 0,
