@@ -249,13 +249,24 @@ const User = sequelize.define('User', {
     allowNull: true,
   },
   
-  // Two-Factor Authentication
+  // Two-Factor Authentication (Email OTP)
   twoFactorEnabled: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
     allowNull: false,
   },
   twoFactorSecret: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+  },
+  
+  // Two-Factor Authentication (Google Authenticator)
+  googleAuthEnabled: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    allowNull: false,
+  },
+  googleAuthSecret: {
     type: DataTypes.STRING(255),
     allowNull: true,
   },

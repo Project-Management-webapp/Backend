@@ -76,6 +76,7 @@ const { checkForAuthenticationCookie } = require("./middleware/authMiddleware");
 const gemniRoutes = require("./routes/aiRoute/gemniRoute");
 const videoCallRoutes = require("./routes/videoCallRoute/videoCallRoute");
 const twoFactorRoutes = require("./routes/twoFactorRoute/twoFactorRoute");
+const googleAuthRoutes = require("./routes/googleAuthRoute/googleAuthRoute");
 
 app.use("/api/auth", employeeAuthRoutes, managerAuthRoutes, commonAuthRoutes);
 
@@ -192,6 +193,9 @@ app.use(
 
 // Two-Factor Authentication Routes
 app.use("/api/2fa", twoFactorRoutes);
+
+// Google Authenticator Routes
+app.use("/api/google-auth", googleAuthRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });

@@ -97,13 +97,30 @@ const handleManagerLogin = async (req, res) => {
       });
     }
 
-    // Check if 2FA is enabled
+    // Check if Email OTP 2FA is enabled
     if (user.twoFactorEnabled) {
-      // Return success but indicate 2FA is required
+      // Return success but indicate Email 2FA is required
       return res.status(200).json({
         success: true,
         require2FA: true,
+        twoFactorMethod: 'email',
         message: "2FA verification required",
+        data: {
+          userId: user.id,
+          email: user.email,
+          fullName: user.fullName
+        }
+      });
+    }
+
+    // Check if Google Authenticator is enabled
+    if (user.googleAuthEnabled) {
+      // Return success but indicate Google Auth is required
+      return res.status(200).json({
+        success: true,
+        require2FA: true,
+        twoFactorMethod: 'google',
+        message: "Google Authenticator verification required",
         data: {
           userId: user.id,
           email: user.email,
