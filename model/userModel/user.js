@@ -7,6 +7,10 @@ const User = sequelize.define('User', {
     primaryKey: true,
     autoIncrement: true,
   },
+  createdBy: {
+  type: DataTypes.INTEGER,
+  allowNull: true,
+  },
   // Basic Information
   employeeId: {
     type: DataTypes.STRING(255),
@@ -305,6 +309,29 @@ const User = sequelize.define('User', {
   },
     rate: {
     type: DataTypes.STRING(50),
+    allowNull: true,
+  },
+  
+  // Manager Approval Status
+  approvalStatus: {
+    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+    allowNull: false,
+    defaultValue: 'approved', // Default approved for employees, will be pending for managers during signup
+  },
+  approvedBy: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id',
+    },
+  },
+  approvedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  rejectionReason: {
+    type: DataTypes.TEXT,
     allowNull: true,
   },
 

@@ -77,8 +77,10 @@ const gemniRoutes = require("./routes/aiRoute/gemniRoute");
 const videoCallRoutes = require("./routes/videoCallRoute/videoCallRoute");
 const twoFactorRoutes = require("./routes/twoFactorRoute/twoFactorRoute");
 const googleAuthRoutes = require("./routes/googleAuthRoute/googleAuthRoute");
+const adminRoutes = require("./routes/adminRoute/adminRoute");
+const adminAuthRoutes = require("./routes/adminRoute/adminAuthRoute");
 
-app.use("/api/auth", employeeAuthRoutes, managerAuthRoutes, commonAuthRoutes);
+app.use("/api/auth", employeeAuthRoutes, managerAuthRoutes, commonAuthRoutes, adminAuthRoutes);
 
 app.use(
   "/api/user/manager",
@@ -197,6 +199,9 @@ app.use("/api/2fa", twoFactorRoutes);
 // Google Authenticator Routes
 app.use("/api/google-auth", googleAuthRoutes);
 
+// Admin Routes
+app.use("/api/admin", adminRoutes);
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
@@ -206,7 +211,7 @@ app.get("/api/health", (req, res) => {
 const onlineUsers = new Map();
 
 io.on('connection', (socket) => {
-  console.log('✅ User connected:', socket.id);
+  console.log('User connected:', socket.id);
 
   // Register user as online
   socket.on('user_online', ({ userId, userName, userRole }) => {
@@ -385,7 +390,7 @@ io.on('connection', (socket) => {
 initDB(() => {
   server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
-    console.log(`Socket.IO is ready for real-time connections`);
+    console.log(`Socket.IO is ready for real-time connections with chat and video call`);
     milestoneReminderJob.start();
     console.log(' Milestone reminder cron job started (runs daily at 9:00 AM)');
   });

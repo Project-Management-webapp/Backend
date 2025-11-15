@@ -7,7 +7,7 @@ const { setTokenCookie, clearTokenCookie } = require("../../services/cookieServi
 
 const handleManagerSignUp = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, fullName } = req.body;
 
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
@@ -23,15 +23,24 @@ const handleManagerSignUp = async (req, res) => {
     const newUser = await User.create({
       email,
       password: hashedPassword,
+      fullName: fullName || null,
       role: "manager",
-      managerId: 'M' + Math.floor(1000 + Math.random() * 9000).toString()
+      managerId: 'M' + Math.floor(1000 + Math.random() * 9000).toString(),
+      approvalStatus: 'pending',
+      isActive: false // Will be activated after admin approval
     });
 
     res.status(201).json({
       success: true,
-      message: "Manager registered successfully",
+      message: "Manager registration submitted successfully. Please wait for admin approval.",
       data: {
-        user: newUser,
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          fullName: newUser.fullName,
+          role: newUser.role,
+          approvalStatus: newUser.approvalStatus
+        },
       },
     });
   } catch (error) {
@@ -59,7 +68,6 @@ const handleManagerLogin = async (req, res) => {
       where: {
         email,
         role: "manager",
-        status: "active",
       },
     });
 
@@ -67,6 +75,29 @@ const handleManagerLogin = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
+      });
+    }
+
+    // Check approval status
+    if (user.approvalStatus === 'pending') {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is pending approval by the administrator. Please wait for approval.",
+      });
+    }
+
+    if (user.approvalStatus === 'rejected') {
+      return res.status(403).json({
+        success: false,
+        message: "Your account registration has been rejected. Please contact the administrator.",
+      });
+    }
+
+    // Check if account is active
+    if (user.status !== 'active' || !user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is not active. Please contact the administrator.",
       });
     }
 

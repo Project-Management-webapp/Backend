@@ -8,6 +8,7 @@ const { sendLoginGuideToEmployee } = require("../../emailService/approvalEmail")
 
 const handleEmployeeSignUp = async (req, res) => {
   try {
+    const managerId = req.user.id;
     const { email, password } = req.body;
 
     const existingUser = await User.findOne({ where: { email } });
@@ -25,7 +26,8 @@ const handleEmployeeSignUp = async (req, res) => {
       email,
       password: hashedPassword,
       role: "employee",
-      employeeId: 'E' + Math.floor(1000 + Math.random() * 9000).toString()
+      employeeId: 'E' + Math.floor(1000 + Math.random() * 9000).toString(),
+      createdBy: managerId,
     });
 
     await sendLoginGuideToEmployee(newUser.email, newUser.role);

@@ -4,9 +4,12 @@ const  User  = require('../../model/userModel/user');
 const handleGetAllEmployees = async (req, res) => {
   try {
 
+    const managerId = req.user.id;
+
     const employees  = await User.findAndCountAll({
       where: {
       role: ['employee'],
+      createdBy: managerId
       },
       order: [['createdAt', 'DESC']]
     });
@@ -31,12 +34,13 @@ const handleGetAllEmployees = async (req, res) => {
 
 const handleGetEmployeeById = async (req, res) => {
   try {
-
+const managerId = req.user.id;
     const { employeeId } = req.params;
 
     const employee = await User.findOne({
       where: {
         id: employeeId,
+        createdBy: managerId,
         role: ['employee']
       },
       attributes: { exclude: ['password'] }
@@ -67,6 +71,7 @@ const handleGetEmployeeById = async (req, res) => {
 
 const handleUpdateEmployeeDetails = async (req, res) => {
   try {
+    const managerId = req.user.id;
     const { employeeId } = req.params;
     const { rate } = req.body;
 
@@ -74,6 +79,7 @@ const handleUpdateEmployeeDetails = async (req, res) => {
     const employee = await User.findOne({
       where: {
         id: employeeId,
+        createdBy: managerId,
         role: 'employee'
       }
     });

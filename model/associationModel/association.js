@@ -6,6 +6,23 @@ const Payment = require("../paymentModel/payment");
 const Notification = require("../notificationModel/notification");
 const SupportTicket = require("../supportTicketModel/supportTicket");
 
+// User self-referential association (for manager-employee relationship)
+User.hasMany(User, {
+  foreignKey: "createdBy",
+  as: "createdUsers",
+  onDelete: "SET NULL",
+});
+User.belongsTo(User, {
+  foreignKey: "createdBy",
+  as: "creator",
+});
+
+// User approval association
+User.belongsTo(User, {
+  foreignKey: "approvedBy",
+  as: "approver",
+});
+
 // User and Project associations
 User.hasMany(Project, {
   foreignKey: "createdBy",

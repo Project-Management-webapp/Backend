@@ -6,35 +6,12 @@ const { Op } = require('sequelize');
 const handleGetMyNotifications = async (req, res) => {
   try {
     const userId = req.user.id;
-    const userRole = req.user.role;
     const { 
       type, 
     } = req.query;
 
-    // Build where conditions based on user role
-    let whereConditions;
-
-    if (userRole === 'admin') {
-      // Admins see: their own notifications + all notifications targeted to all_admins + all notifications targeted to all_managers
-      whereConditions = {
-        [Op.or]: [
-          { userId },
-          { targetRole: 'all_admins' },
-          { targetRole: 'all_managers' }
-        ]
-      };
-    } else if (userRole === 'manager') {
-      // Managers see: their own notifications + all notifications targeted to all_managers
-      whereConditions = {
-        [Op.or]: [
-          { userId },
-          { targetRole: 'all_managers' }
-        ]
-      };
-    } else {
-      // Employees see only their own notifications
-      whereConditions = { userId };
-    }
+    // Build where conditions - only get notifications for this specific user
+    let whereConditions = { userId };
 
     if (type) whereConditions.type = type;
 
@@ -78,7 +55,7 @@ const handleDeleteNotification = async (req, res) => {
       });
     }
 
-    // Only owner can delete notification
+    // Only the owner of the notification can delete it
     if (notification.userId !== userId) {
       return res.status(403).json({
         success: false,

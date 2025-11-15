@@ -8,8 +8,11 @@ const { sequelize } = require('../../mysqlConnection/dbConnection');
 
 const handleGetFinancialOverview = async (req, res) => {
   try {
+    const managerId = req.user.id; // Get logged-in manager's ID
+    
     const projects = await Project.findAll({
       where: {
+        createdBy: managerId, // Only get projects created by this manager
         [Op.or]: [
           {
             status: {
@@ -211,10 +214,13 @@ const handleGetFinancialOverview = async (req, res) => {
  */
 const handleGetProjectProfitLoss = async (req, res) => {
   try {
+    const managerId = req.user.id; // Get logged-in manager's ID
     const { projectId } = req.params;
+    
     const project = await Project.findOne({
       where: {
         id: projectId,
+        createdBy: managerId // Only allow access to manager's own projects
       }
     });
 
@@ -406,9 +412,11 @@ const handleGetProjectProfitLoss = async (req, res) => {
  */
 const handleGetIncomeSummary = async (req, res) => {
   try {
+    const managerId = req.user.id; // Get logged-in manager's ID
     const { startDate, endDate, projectType, status } = req.query;
 
     const whereConditions = {
+      createdBy: managerId // Only get projects created by this manager
     };
 
     if (status) {
@@ -609,8 +617,10 @@ const handleGetIncomeSummary = async (req, res) => {
  */
 const handleGetEmployeeAllocations = async (req, res) => {
   try {
+    const managerId = req.user.id; // Get logged-in manager's ID
+    
     const projects = await Project.findAll({
-      where: { }
+      where: { createdBy: managerId } // Only get projects created by this manager
     });
 
     const projectIds = projects.map(p => p.id);
@@ -819,11 +829,14 @@ const handleGetEmployeeAllocations = async (req, res) => {
 
 const handleGetResourceComparison = async (req, res) => {
   try {
-    
+    const managerId = req.user.id; // Get logged-in manager's ID
     const { projectId } = req.params;
     
     const project = await Project.findOne({
-      where: { id: projectId },
+      where: { 
+        id: projectId,
+        createdBy: managerId // Only allow access to manager's own projects
+      },
       attributes: [
         'id', 'name', 'status', 'budget', 
         'estimatedHours', 'actualHours',

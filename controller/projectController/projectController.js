@@ -172,6 +172,7 @@ const handleCreateProject = async (req, res) => {
 
 const handleGetAllProjects = async (req, res) => {
   try {
+    const managerId = req.user.id;
     const { status, priority, search } = req.query;
 
     const whereConditions = {};
@@ -193,7 +194,11 @@ const handleGetAllProjects = async (req, res) => {
       });
       const projectIds = assignments.map((a) => a.projectId);
       whereConditions.id = { [Op.in]: projectIds };
+    } else if (req.user.role === "manager") {
+      // If manager, show only their own projects
+      whereConditions.createdBy = managerId;
     }
+    
     const projects = await Project.findAndCountAll({
       where: whereConditions,
       include: [
@@ -236,10 +241,11 @@ const handleGetAllProjects = async (req, res) => {
 
 const handleGetProjectById = async (req, res) => {
   try {
+    const managerId = req.user.id;
     const { projectId } = req.params;
 
     const project = await Project.findOne({
-      where: { id: projectId },
+      where: { id: projectId, createdBy: managerId },
       include: [
         {
           model: User,
@@ -311,6 +317,7 @@ const handleGetProjectById = async (req, res) => {
 
 const handleUpdateProject = async (req, res) => {
   try {
+    const managerId = req.user.id;
     const { projectId } = req.params;
     const {
       // Basic Information
@@ -503,7 +510,8 @@ const handleUpdateProject = async (req, res) => {
     await project.update(updateData);
 
     const updatedProject = await Project.findOne({
-      where: { id: projectId },
+
+      where: { id: projectId, createdBy: managerId },
       include: [
         {
           model: User,
@@ -531,9 +539,12 @@ const handleUpdateProject = async (req, res) => {
 
 const handleDeleteProject = async (req, res) => {
   try {
+    const managerId = req.user.id;
     const { projectId } = req.params;
 
-    const project = await Project.findByPk(projectId);
+    const project = await Project.findByPk(projectId, {
+      where: { createdBy: managerId }
+    });
 
     if (!project) {
       return res.status(404).json({

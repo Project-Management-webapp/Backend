@@ -1,6 +1,7 @@
 const SupportTicket = require('../../model/supportTicketModel/supportTicket');
 const User = require('../../model/userModel/user');
 const Project = require('../../model/projectModel/project');
+const ProjectAssignment = require('../../model/projectAssignmentModel/projectAssignment');
 const Notification = require('../../model/notificationModel/notification');
 const { Op } = require('sequelize');
 
@@ -159,6 +160,7 @@ async function handleGetMyTickets(req, res) {
 
 async function handleGetAllTickets(req, res) {
   try {
+    const managerId = req.user.id; // Get logged-in manager's ID
     const {
       status,
       category,
@@ -168,6 +170,26 @@ async function handleGetAllTickets(req, res) {
     } = req.query;
 
     const whereClause = {};
+
+    // Get projects created by this manager
+    const managerProjects = await Project.findAll({
+      where: { createdBy: managerId },
+      attributes: ['id']
+    });
+    const projectIds = managerProjects.map(p => p.id);
+
+    // Get employees assigned to these projects
+    const assignments = await ProjectAssignment.findAll({
+      where: { 
+        projectId: { [Op.in]: projectIds },
+        isActive: true
+      },
+      attributes: ['employeeId']
+    });
+    const employeeIds = [...new Set(assignments.map(a => a.employeeId))];
+
+    // Filter tickets to only show tickets from employees assigned to this manager's projects
+    whereClause.employeeId = { [Op.in]: employeeIds };
 
     if (status) {
       whereClause.status = status;
@@ -206,13 +228,13 @@ async function handleGetAllTickets(req, res) {
 
     });
 
-    // Statistics
+    // Statistics - only for this manager's employees
     const stats = {
       total: tickets.count,
-      open: await SupportTicket.count({ where: { status: 'open' } }),
-      inProgress: await SupportTicket.count({ where: { status: 'in_progress' } }),
-      resolved: await SupportTicket.count({ where: { status: 'resolved' } }),
-      closed: await SupportTicket.count({ where: { status: 'closed' } }),
+      open: await SupportTicket.count({ where: { ...whereClause, status: 'open' } }),
+      inProgress: await SupportTicket.count({ where: { ...whereClause, status: 'in_progress' } }),
+      resolved: await SupportTicket.count({ where: { ...whereClause, status: 'resolved' } }),
+      closed: await SupportTicket.count({ where: { ...whereClause, status: 'closed' } }),
     };
 
     res.json({
