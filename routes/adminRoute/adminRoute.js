@@ -10,6 +10,7 @@ const {
   handleGetAllEmployees,
   handleGetSystemStats
 } = require('../../controller/adminController/adminController');
+const { handleGetProfile } = require('../../controller/adminController/adminAuthController');
 
 const router = express.Router();
 
@@ -18,6 +19,7 @@ router.use(checkForAuthenticationCookie());
 router.use(authorizeRoles(['admin']));
 
 // Manager management routes
+router.get('/profile', handleGetProfile);
 router.get('/managers', handleGetAllManagers);
 router.get('/managers/pending', handleGetPendingManagers);
 router.get('/managers/:managerId', handleGetManagerById);

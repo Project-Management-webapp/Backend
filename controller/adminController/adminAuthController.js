@@ -8,15 +8,6 @@ const handleAdminSignUp = async (req, res) => {
   try {
     const { email, password, fullName, adminSecret } = req.body;
 
-    // Check admin secret key for security (set in .env)
-    const ADMIN_SECRET = process.env.ADMIN_SECRET_KEY;
-    if (!ADMIN_SECRET || adminSecret !== ADMIN_SECRET) {
-      return res.status(403).json({
-        success: false,
-        message: "Invalid admin secret key. Admin registration not authorized.",
-      });
-    }
-
     // Check if admin with this email already exists
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
@@ -199,9 +190,43 @@ const handleAdminLogout = async (req, res) => {
     });
   }
 };
+const handleGetProfile = async (req, res) => {
+  try {
+    const userId = req.user.id; 
+
+    const user = await User.findOne({
+      where: {
+        id: userId,
+        role: ["admin"],
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin profile not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Profile retrieved successfully",
+      data: user,
+    });
+  } catch (error) {
+    console.error("Get profile error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
 
 module.exports = {
   handleAdminSignUp,
   handleAdminLogin,
   handleAdminLogout,
+  handleGetProfile
 };
