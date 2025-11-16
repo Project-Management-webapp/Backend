@@ -848,6 +848,11 @@ const handleGetAllProjectAssignments = async (req, res) => {
     const { status, name } = req.query;
     const where = {};
 
+    // Filter projects by logged-in manager (only show projects created by this manager)
+    if (req.user && req.user.id) {
+      where.createdBy = req.user.id;
+    }
+
     if (status) {
       where.status = status;
     }

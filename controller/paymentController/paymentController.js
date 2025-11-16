@@ -30,33 +30,36 @@ const handleGetAllPayments = async (req, res) => {
       };
     }
 
-
+    // Build include array with project filter for manager
+    const includeArray = [
+      {
+        model: User,
+        as: 'employee',
+        attributes: ['id', 'fullName', 'email', 'position', 'department']
+      },
+      {
+        model: Project,
+        as: 'project',
+        attributes: ['id', 'name', 'status'],
+        // Filter payments to only show projects created by the logged-in manager
+        where: req.user && req.user.role === 'manager' ? { createdBy: req.user.id } : undefined,
+        required: true // Inner join to ensure only payments with matching projects are returned
+      },
+      {
+        model: User,
+        as: 'manager',
+        attributes: ['id', 'fullName', 'email']
+      },
+      {
+        model: ProjectAssignment,
+        as: 'assignment',
+        attributes: ['id', 'allocatedAmount', 'actualAmount', 'actualHours', 'actualConsumables', 'actualMaterials', 'rate']
+      }
+    ];
 
     const payments  = await Payment.findAndCountAll({
       where: whereConditions,
-      include: [
-        {
-          model: User,
-          as: 'employee',
-          attributes: ['id', 'fullName', 'email', 'position', 'department']
-        },
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name', 'status']
-        },
-        {
-          model: User,
-          as: 'manager',
-          attributes: ['id', 'fullName', 'email']
-        },
-        {
-          model: ProjectAssignment,
-          as: 'assignment',
-          attributes: ['id', 'allocatedAmount', 'actualAmount', 'actualHours', 'actualConsumables', 'actualMaterials', 'rate']
-        }
-      ],
-    
+      include: includeArray,
       order: [['createdAt', 'DESC']]
     });
 
@@ -95,7 +98,7 @@ const handleGetPaymentById = async (req, res) => {
         {
           model: Project,
           as: 'project',
-          attributes: ['id', 'name', 'status', 'budget']
+          attributes: ['id', 'name', 'status', 'budget', 'createdBy']
         },
         {
           model: User,
@@ -123,6 +126,16 @@ const handleGetPaymentById = async (req, res) => {
         return res.status(403).json({
           success: false,
           message: "You can only view your own payment records"
+        });
+      }
+    }
+
+    // Managers can only view payments for projects they created
+    if (req.user.role === 'manager') {
+      if (payment.project && payment.project.createdBy !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only view payments for projects you created"
         });
       }
     }
@@ -379,7 +392,7 @@ const handleApprovePaymentRequest = async (req, res) => {
         {
           model: Project,
           as: 'project',
-          attributes: ['id', 'name']
+          attributes: ['id', 'name', 'createdBy']
         }
       ]
     });
@@ -389,6 +402,16 @@ const handleApprovePaymentRequest = async (req, res) => {
         success: false,
         message: "Payment not found"
       });
+    }
+
+    // Check if manager owns the project
+    if (req.user.role === 'manager' && payment.project) {
+      if (payment.project.createdBy !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only approve payments for projects you created"
+        });
+      }
     }
 
     if (payment.requestStatus !== 'requested') {
@@ -519,7 +542,7 @@ const handleRejectPaymentRequest = async (req, res) => {
         {
           model: Project,
           as: 'project',
-          attributes: ['id', 'name']
+          attributes: ['id', 'name', 'createdBy']
         }
       ]
     });
@@ -529,6 +552,16 @@ const handleRejectPaymentRequest = async (req, res) => {
         success: false,
         message: "Payment not found"
       });
+    }
+
+    // Check if manager owns the project
+    if (req.user.role === 'manager' && payment.project) {
+      if (payment.project.createdBy !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only reject payments for projects you created"
+        });
+      }
     }
 
     if (payment.requestStatus !== 'requested') {
