@@ -19,7 +19,6 @@ async function send2FAEmail(email, fullName, otp) {
             padding: 20px;
           }
           .container {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 10px;
             padding: 30px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -32,12 +31,13 @@ async function send2FAEmail(email, fullName, otp) {
           }
           .header {
             text-align: center;
-            color: white;
+            color: black;
             margin-bottom: 0;
           }
           .header h1 {
             margin: 0;
             font-size: 28px;
+            color: black;
           }
           .otp-box {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
