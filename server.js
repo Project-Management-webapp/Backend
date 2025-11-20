@@ -11,7 +11,7 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 8000;
 
-const allowedOrigins = [process.env.FRONTEND_URL, process.env.FRONTEND_URL2];
+const allowedOrigins = [process.env.FRONTEND_URL, process.env.FRONTEND_URL2,process.env.FRONTEND_URL3];
 
 // CORS configuration for Express
 app.use(
@@ -79,6 +79,7 @@ const twoFactorRoutes = require("./routes/twoFactorRoute/twoFactorRoute");
 const googleAuthRoutes = require("./routes/googleAuthRoute/googleAuthRoute");
 const adminRoutes = require("./routes/adminRoute/adminRoute");
 const adminAuthRoutes = require("./routes/adminRoute/adminAuthRoute");
+const contactRoutes = require("./routes/contactRoute/contactRoute");
 
 app.use("/api/auth", employeeAuthRoutes, managerAuthRoutes, commonAuthRoutes, adminAuthRoutes);
 
@@ -201,6 +202,9 @@ app.use("/api/google-auth", googleAuthRoutes);
 
 // Admin Routes
 app.use("/api/admin", adminRoutes);
+
+// Public Contact Route (no authentication required)
+app.use("/api", contactRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
